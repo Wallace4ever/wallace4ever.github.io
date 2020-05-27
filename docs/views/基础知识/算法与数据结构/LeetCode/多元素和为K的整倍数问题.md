@@ -50,104 +50,108 @@ public class No1010_PairsOfSongs {
 而本题中加法不限于2目（2首），是任意长度的连续子数组都可以相加，则如何通过记忆化的方式快速得出任一子数组元素的和成为关键问题
 
 ````Java
-public class No523_ContinuousSubarraySum {
-    //暴力解法，计算每个子数组的元素和，对k取余数为0则返回true,复杂度为O(n^2)
-    public boolean checkSubarraySum1(int[] nums, int k) {
-        //防御性编程部分
-        if (nums==null||nums.length<2) return false;
-        if (k == 0) {
-            for (int i = 0; i < nums.length - 1; i++) {
-                if (nums[i]==0&&nums[i+1]==0) return true;
-            }
-            return false;
-        }
-
-        for (int start = 0; start < nums.length - 1; start++) {
-            //使用O(1)的额外空间存储nums[i]到nums[j]的和
-            int sum=nums[start];
-            for (int end = start + 1; end < nums.length; end++) {
-                sum+=nums[end];
-                if (sum%k==0) return true;
-            }
-        }
-        return false;
-    }
-
-    //尝试通过记忆化的方式避免重复计算子问题，
-    public boolean checkSubarraySum2(int[] nums, int k) {
-        //防御性编程部分
-        if (nums==null||nums.length<2) return false;
-        if (k == 0) {
-            for (int i = 0; i < nums.length - 1; i++) {
-                if (nums[i]==0&&nums[i+1]==0) return true;
-            }
-            return false;
-        }
-
-        //sums[i]存储的是nums[0]+nums[1]+...+nums[i]的值（前缀和），则要计算nums[i]到nums[j]的和可以直接用sums[j]-sum[i]+nums[i]
-        //这里使用了O(n)的空间来试图快速计算子数组的元素和
-        int[] sums=new int[nums.length];
-        sums[0]=nums[0];
-        for (int i = 1; i < sums.length; i++) {
-            sums[i]=sums[i-1]+nums[i];
-        }
-        for (int start = 0; start < nums.length - 1; start++) {
-            for (int end = start + 1; end < nums.length; end++) {
-                //但由于依然要使用两个嵌套for来分别确定子数组的起始坐标，时间复杂度仍然为O(n^2)
-                if ((sums[end]-sums[start]+nums[start])%k==0)
-                    return true;
-            }
-        }
-        return false;
-    }
-
-    //使用散列（数组和HashMap均可）,结合取模来寻找，类比1010的思想，但这里取模的不是nums中某一元素的值，而是sums中存储的前缀和
-    //对sums[i]%k得到的结果result表示nums[0]~nums[i]的和k的某倍数的距离，而如果后面某一j也有nums[0]~nums[j]和k的某倍数的距离也为result,则i~j间的元素和为k的整数倍
-    //这时就可以一边计算sums一边插入到散列中，发现有重复的则说明存在满足条件的子数组
-    //前两种解法对k取模只是用在最终直接判断子数组元素和是否满足条件，而题目只问是否存在（1010中只问存在多少对），都没有直接问是哪些
-    public boolean checkSubarraySum3(int[] nums, int k) {
-        if (nums==null||nums.length<2) return false;
+//暴力解法，计算每个子数组的元素和，对k取余数为0则返回true,复杂度为O(n^2)
+public boolean checkSubarraySum1(int[] nums, int k) {
+    //防御性编程部分
+    if (nums==null||nums.length<2) return false;
+    if (k == 0) {
         for (int i = 0; i < nums.length - 1; i++) {
             if (nums[i]==0&&nums[i+1]==0) return true;
         }
-        if(k==0) return false;
+        return false;
+    }
 
-        //自己手动管理Hash，踩了很多坑。最后一次用例[0,1,0,3,0,4,0,4,0]，5应为false，但输出为true，调不动了
-        k=Math.abs(k);
-        int hash[] =new int[k];
-        int sum=0;
-        for (int i = 0; i < nums.length; i++) {
-            sum+=nums[i];//前缀和
-            if (sum%k==0)return true;
-            if(nums[i]==0)continue;
-            if (hash[sum % k] ==0) {
-                hash[sum % k] = i;
-            } else if((i-hash[sum%k])!=1){
+    for (int start = 0; start < nums.length - 1; start++) {
+        //使用O(1)的额外空间存储nums[i]到nums[j]的和
+        int sum=nums[start];
+        for (int end = start + 1; end < nums.length; end++) {
+            sum+=nums[end];
+            if (sum%k==0) return true;
+        }
+    }
+    return false;
+}
+````
+
+可以尝试通过记忆化的方式避免重复计算子问题：
+````java
+public boolean checkSubarraySum2(int[] nums, int k) {
+    //防御性编程部分
+    if (nums==null||nums.length<2) return false;
+    if (k == 0) {
+        for (int i = 0; i < nums.length - 1; i++) {
+            if (nums[i]==0&&nums[i+1]==0) return true;
+        }
+        return false;
+    }
+
+    //sums[i]存储的是nums[0]+nums[1]+...+nums[i]的值（前缀和），则要计算nums[i]到nums[j]的和可以直接用sums[j]-sum[i]+nums[i]
+    //这里使用了O(n)的空间来试图快速计算子数组的元素和
+    int[] sums=new int[nums.length];
+    sums[0]=nums[0];
+    for (int i = 1; i < sums.length; i++) {
+        sums[i]=sums[i-1]+nums[i];
+    }
+    for (int start = 0; start < nums.length - 1; start++) {
+        for (int end = start + 1; end < nums.length; end++) {
+            //但由于依然要使用两个嵌套for来分别确定子数组的起始坐标，时间复杂度仍然为O(n^2)
+            if ((sums[end]-sums[start]+nums[start])%k==0)
                 return true;
-            }
         }
-        return false;
     }
+    return false;
+}
+````
 
-    //官方直接使用HashMap
-    public boolean checkSubarraySum(int[] nums, int k) {
-        int sum = 0;
-        HashMap < Integer, Integer > map = new HashMap< >();
-        //这一步可以应对[k*i,j*i] i，官方只讲了大概思路，对这里语焉不详
-        map.put(0, -1);
-        for (int i = 0; i < nums.length; i++) {
-            sum += nums[i];
-            if (k != 0)
-                sum = sum % k;
-            //如果map中已有该余数，且对应的i与当前i的距离超过1的话则存在（等于则只是单个值是k的倍数，题目要求子数组至少2个数）
-            if (map.containsKey(sum)) {
-                //距离为1则什么都不做，保留上一次插入的i
-                if (i - map.get(sum) > 1)
-                    return true;
-            } else
-                map.put(sum, i);
-        }
-        return false;
+使用散列（数组和HashMap均可）,结合取模来寻找，类比1010的思想，但这里取模的不是nums中某一元素的值，而是sums中存储的前缀和。
+对sums[i]%k得到的结果result表示nums[0]~nums[i]的和k的某倍数的距离，而如果后面某一j也有nums[0]~nums[j]和k的某倍数的距离也为result,则i~j间的元素和为k的整数倍。
+这时就可以一边计算sums一边插入到散列中，发现有重复的则说明存在满足条件的子数组。
+前两种解法对k取模只是用在最终直接判断子数组元素和是否满足条件，而题目只问是否存在（1010中只问存在多少对），都没有直接问是哪些。
+````java
+public boolean checkSubarraySum3(int[] nums, int k) {
+    if (nums==null||nums.length<2) return false;
+    for (int i = 0; i < nums.length - 1; i++) {
+        if (nums[i]==0&&nums[i+1]==0) return true;
     }
+    if(k==0) return false;
+
+    //自己手动管理Hash，踩了很多坑。最后一次用例[0,1,0,3,0,4,0,4,0]，5应为false，但输出为true，调不动了
+    k=Math.abs(k);
+    int hash[] =new int[k];
+    int sum=0;
+    for (int i = 0; i < nums.length; i++) {
+        sum+=nums[i];//前缀和
+        if (sum%k==0)return true;
+        if(nums[i]==0)continue;
+        if (hash[sum % k] ==0) {
+            hash[sum % k] = i;
+        } else if((i-hash[sum%k])!=1){
+            return true;
+        }
+    }
+    return false;
+}
+````
+
+官方直接使用HashMap：
+````java
+public boolean checkSubarraySum(int[] nums, int k) {
+    int sum = 0;
+    HashMap < Integer, Integer > map = new HashMap< >();
+    //这一步可以应对[k*i,j*i] i，官方只讲了大概思路，对这里语焉不详
+    map.put(0, -1);
+    for (int i = 0; i < nums.length; i++) {
+        sum += nums[i];
+        if (k != 0)
+            sum = sum % k;
+        //如果map中已有该余数，且对应的i与当前i的距离超过1的话则存在（等于则只是单个值是k的倍数，题目要求子数组至少2个数）
+        if (map.containsKey(sum)) {
+            //距离为1则什么都不做，保留上一次插入的i
+            if (i - map.get(sum) > 1)
+                return true;
+        } else
+            map.put(sum, i);
+    }
+    return false;
 }
 ````

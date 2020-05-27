@@ -10,6 +10,7 @@ categories:
 ::: tip
 Markdown作为一种非所见即所得的轻量级格式控制语言，能适用于博客、文档等很多场景，它能够让作者更加关注文章内容而不用考虑太多排版的问题。熟悉Markdown后可以写出更美观规范博客，本次就来回顾一下常用的Markdown基本语法。
 :::
+<!-- more -->
 
 # 正文
 
@@ -19,7 +20,7 @@ Markdown支持两种格式的标题写法：一种是Setext式（使用得少）
 # 一级标题
 ## 二级标题
 ```
-<!-- more -->
+
 效果为：
 # 一级标题
 ## 二级标题
@@ -44,7 +45,7 @@ Markdown中列表项分为有序列表和无序列表，有序列表使用数字
 		* 孙项目
 * 列表项目2
 
-## 3. 引用与贴士
+## 3. 引用与自定义容器
 在行首使用右尖括号来表示引用，如：
 ```
 > 学术就是包装
@@ -52,14 +53,61 @@ Markdown中列表项分为有序列表和无序列表，有序列表使用数字
 效果为：
 > 学术就是包装
 
-Markdown本身并不支持贴士，但VuePress和Hexo等工具构建博客时能够解析一些额外的标识，如：
+VuePress支持Emoji、目录和自定义容器等一些扩展Markdown语法，如：
 ```
+:tada: :100:
+
 ::: tip
-这是摘要
+This is a tip
+:::
+
+::: warning
+This is a warning
+:::
+
+::: danger
+This is a dangerous warning
+:::
+
+::: theorem 牛顿第一定律
+假若施加于某物体的外力为零，则该物体的运动速度不变。
+::: right
+来自 [维基百科](https://zh.wikipedia.org/wiki/)
+:::
+
+::: details 点击查看代码
+你好，VuePress！这是一个详情块，在 IE / Edge 中不生效
 :::
 
 <!-- more --> 划分文章的预览区域，注意空格
 ```
+效果为：
+
+:tada: :100:
+
+::: tip
+This is a tip
+:::
+
+::: warning
+This is a warning
+:::
+
+::: danger
+This is a dangerous warning
+:::
+
+::: theorem 牛顿第一定律
+假若施加于某物体的外力为零，则该物体的运动速度不变。
+::: right
+来自 [维基百科](https://zh.wikipedia.org/wiki/)
+:::
+
+::: details 点击查看代码
+```js
+console.log('你好，VuePress！这是一个详情块，在 IE / Edge 中不生效')
+```
+:::
 
 ## 4. 字体控制
 使用星号（或下划线）和波浪号包住文字来实现字体控制，一对星号为斜体，两对星号为粗体，三对星号为粗体加斜体，两对波浪号为删除线。直接在单行使用三个星号表示分割线（另外注意Markdown中换行通常需要额外加一个回车），如：
