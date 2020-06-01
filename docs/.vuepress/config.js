@@ -73,13 +73,19 @@ module.exports = {
       {
         "title": "程序羊",
         "desc": "普通的开发者 热情的学习者 狂热的数码迷",
-        "thumbnail": "https://vuepress-theme-reco.recoluan.com/icon_vuepress_reco.png",
+        "thumbnail": "https://www.codesheep.cn/css/images/codesheep_logo.png",
         "link": "https://www.codesheep.cn/"
+      },
+      {
+        "title": "韦阳的博客",
+        "desc": "华东师范大学 | 计算机科学与技术 | 自然语言处理",
+        "thumbnail": "https://godweiyang.com/medias/logo.png",
+        "link": "https://godweiyang.com/"
       },
       {
         "title": "vuepress-theme-reco",
         "desc": "A simple and beautiful vuepress Blog & Doc theme.",
-        "avatar": "https://www.codesheep.cn/css/images/codesheep_logo.png",
+        "avatar": "https://vuepress-theme-reco.recoluan.com/icon_vuepress_reco.png",
         "link": "https://vuepress-theme-reco.recoluan.com"
       }
     ],
