@@ -8,7 +8,7 @@ categories:
 ---
 
 :::tip
-我们希望设计一个可以实现简单对象和SQL自动映射的框架，但是整体用法和设计比Hibernate、Mybatis简单，只保留基础的功能。本项目参考了高淇老师的Java300集课程，目的在于加深对ORM框架的理解，同时也增加对设计模式的理解。
+我们希望设计一个可以实现简单对象和SQL自动映射的框架，但是整体用法和设计比Hibernate、Mybatis简单，只保留基础的功能。本项目参考了高淇老师的Java300集课程，目的在于加深对ORM框架的理解，同时也增加对设计模式的理解。项目源代码见[Github仓库](https://github.com/Wallace4ever/MYORM)。
 :::
 <!-- more -->
 
@@ -260,5 +260,88 @@ public static String createJavaSrc(TableInfo tableInfo,TypeConverter converter) 
 }
 ```
 
+### 将源代码写入到指定包中的.java文件
+在前面得到一张表对应的java类源代码的基础上，将源代码写入指定包下的.java源文件中
+```java
+public static void createJavaPOFile(TableInfo tableInfo, TypeConverter converter) {
+    //得到源代码
+    String src=createJavaSrc(tableInfo,converter);
+    String srcPath=DBManager.getConf().getSrcPath()+"/";
+    String packagePath=DBManager.getConf().getPoPackage().replaceAll("\\.","/");
+
+    File file=new File(srcPath+packagePath);
+    if (!file.exists()) {//指定目录不存在则帮助用户建立
+        file.mkdirs();
+    }
+
+    BufferedWriter bw=null;
+    try {
+        bw=new BufferedWriter(new FileWriter(file.getAbsolutePath()+"/"+StringUtil.firstChar2UpperCase(tableInfo.getT_name())+".java"));
+        bw.write(src);
+        bw.flush();
+        bw.close();
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+}
+```
+那么就可以在TableContext类中创建静态方法updateJavaPOFile()并在其自身的静态代码块中调用，实现了每次加载本框架时就更新一次数据库中的表到对应的类源文件。
+```java
+public static void updateJavaPOFile() {
+    Map<String,TableInfo> map=TableContext.tables;
+    for (TableInfo ti : map.values()) {
+        JavaFileUtils.createJavaPOFile(ti,new MySqlTypeConverter());
+    }
+}
+```
+:::warning
+这边遇到了一个坑，之前根据老师教的内容在TableContext类中使用DatabaseMetaData获取数据库中表信息时使用的是：
+```java
+ResultSet tableSet=metaData.getTables(null,"orm","%",new String[]{"TABLE"});
+```
+我在网上查的一些早期的资料称MySQL不支持第一个参数catalog，置空即可，直接使用第二个参数schemaPattern来把范围缩小到目标数据库。然而这里却将整个MySQL中所有的schema中的table都获取了过来，将catalog调整为"orm"就解决了该问题，可能是MySQL从某个版本开始支持使用catalog了？
+:::
+
+## 编写Query的实现类MySqlQuery
+前面已经完成了第一大步：由表的信息生成对应的java类。接下来就需要编写Query的实现类，ORM是对象关系映射，增删改是从对象到数据库，查询是从数据库到对象。
+
+### 生成并执行delete语句
+首先要实现根据类和主键删除对应的记录，主键通常是int id，但有时也可能是其他类型故改为Object。为了通过po类得到对应的表信息TableInfo中的主键值，需要使用TableContext类中维护的`Map<Class, TableInfo> poClassTableMap`。
+```java
+@Override
+public int delete(Class cla, Object id) {
+    //类结构与表结构的映射Emp.class,2-> delete from emp where id=2
+    //通过Class对象找TableInfo，进一步得到表名与主键名
+    TableInfo tableInfo=TableContext.poClassTableMap.get(cla);
+    ColumnInfo onlyPriKey=tableInfo.getPrimaryKey();
+    String sql="delete from "+tableInfo.getT_name()+" where "+onlyPriKey.getName()+"=?";
+    return  executeDML(sql,new Object[]{id});
+}
+```
+此外还可能需要根据某一具体的对象删除其在表中对应的记录，这时可以根据该对象对应的po类进一步得到其在在Map中对应的TableInfo表结构对象,从而得到该表的主键名。得到主键名后使用反射调用该对象对应的"get主键()"方法得到该对象的主键值。此时就可以调用`delete(Class cla, Object id)`实现构造与删除。
+```java
+@Override
+public void delete(Object object) {
+    Class c=object.getClass();
+    TableInfo tableInfo=TableContext.poClassTableMap.get(c);
+    ColumnInfo primaryKey=tableInfo.getPrimaryKey();
+    //通过反射机制调用属性对应的get/set方法
+    Object value=ReflectUtils.invokeGet(primaryKey.getName(),object);
+    delete(c,value);
+}
+
+public static Object invokeGet(String fieldName, Object object) {
+    //通过反射机制调用该对象该属性对应的get方法
+    Object obj=null;
+    try {
+        Class cla=object.getClass();
+        Method method=cla.getMethod("get"+ StringUtil.firstChar2UpperCase(fieldName),null);
+        obj=method.invoke(object,null);
+    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+        e.printStackTrace();
+    }
+    return obj;
+}
+```
 
 未完待续
