@@ -8,7 +8,7 @@ categories:
 ---
 
 :::tip
-我们希望设计一个可以实现简单对象和SQL自动映射的框架，但是整体用法和设计比Hibernate、Mybatis简单，只保留基础的功能。本项目参考了高淇老师的Java300集课程，目的在于加深对ORM框架的理解，同时也增加对设计模式的理解。项目源代码见[Github仓库](https://github.com/Wallace4ever/MYORM)。
+我们希望设计一个可以实现简单对象和SQL自动映射的框架，但是整体用法和设计比Hibernate、Mybatis简单，只保留基础的功能。本项目参考了高淇老师的Java300集课程，目的在于加深对ORM框架的理解，同时也增加对设计模式的理解。本文篇幅较长建议根据二级标题查询温故，项目源代码见[Github仓库](https://github.com/Wallace4ever/MYORM)。
 :::
 <!-- more -->
 
@@ -163,17 +163,8 @@ public String db2JavaType(String columnType) {
         return "Double";
     }else if ("float".equalsIgnoreCase(columnType)){
         return "Float";
-    }else if ("clob".equalsIgnoreCase(columnType)){
-        return "java.sql.Clob";
-    }else if ("blob".equalsIgnoreCase(columnType)){
-        return "java.sql.Blob";
-    }else if ("date".equalsIgnoreCase(columnType)){
-        return "java.sql.Date";
-    }else if ("time".equalsIgnoreCase(columnType)){
-        return "java.sql.Time";
-    }else if ("timestamp".equalsIgnoreCase(columnType)){
-        return "java.sql.Timestamp";
     }
+    /*更多类型...*/
     return null;
 }
 ```
@@ -302,7 +293,7 @@ ResultSet tableSet=metaData.getTables(null,"orm","%",new String[]{"TABLE"});
 我在网上查的一些早期的资料称MySQL不支持第一个参数catalog，置空即可，直接使用第二个参数schemaPattern来把范围缩小到目标数据库。然而这里却将整个MySQL中所有的schema中的table都获取了过来，将catalog调整为"orm"就解决了该问题，可能是MySQL从某个版本开始支持使用catalog了？
 :::
 
-## 编写Query的实现类MySqlQuery
+## 编写Query的实现类MySqlQuery：DML语句
 前面已经完成了第一大步：由表的信息生成对应的java类。接下来就需要编写Query的实现类，ORM是对象关系映射，增删改是从对象到数据库，查询是从数据库到对象。
 
 ### 生成并执行delete语句
@@ -341,6 +332,92 @@ public static Object invokeGet(String fieldName, Object object) {
         e.printStackTrace();
     }
     return obj;
+}
+```
+### 真正执行DML语句
+无论是增删改最终都需要调用executeDML()方法，其中包括获取数据库连接、预编译SQL语句、设置SQL参数、返回执行结果。
+```java
+public int executeDML(String sql, Object[] params) {
+    Connection conn=DBManager.getConn();
+    int count =0;
+    PreparedStatement ps=null;
+    try {
+        ps=conn.prepareStatement(sql);
+        JDBCUtils.handleParams(ps,params);
+        count=ps.executeUpdate();
+    } catch (SQLException throwables) {
+        throwables.printStackTrace();
+    }
+    return 0;
+}
+```
+其中将为SQL设置参数的功能封装到JDBCUtils.handleParams(ps,params)方法中。
+```java
+public static void handleParams(PreparedStatement ps, Object[] params) {
+    if (params != null) {
+        for (int i = 0; i < params.length; i++) {
+            try {
+                ps.setObject(1+i,params[i]);
+            } catch (SQLException throwables) {
+                throwables.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+### 生成并执行insert语句
+生成insert语句的过程是由po对象obj得到`insert into 表名 (字段名,字段名，……) values (参数,?,...)`的过程。
+```java
+@Override
+public void insert(Object object) {
+    Class cla=object.getClass();
+    TableInfo tableInfo=TableContext.poClassTableMap.get(cla);
+    List<Object> list=new ArrayList<>();//存储sql参数对象
+    StringBuilder sql=new StringBuilder("insert into "+tableInfo.getT_name()+" (");
+
+    //获得类所有的属性，以及将参数对象插入list中
+    Field[] fs=cla.getDeclaredFields();
+    int countNotNullField=0;
+    for (Field f : fs) {
+        String fieldName=f.getName();
+        Object fieldValue=ReflectUtils.invokeGet(fieldName,object);
+        if (object != null) {
+            sql.append(fieldName+",");
+            countNotNullField++;
+            list.add(fieldValue);
+        }
+    }
+    sql.setCharAt(sql.length()-1,')');
+    sql.append(" values (");
+    for (int i = 0; i < countNotNullField; i++) {
+        sql.append("?,");
+    }
+    sql.setCharAt(sql.length()-1,')');
+    executeDML(sql.toString(),list.toArray());
+}
+```
+
+### 生成并执行update语句
+类似地，由传入的obj和要修改的属性名数组{"uname","pwd"}生成 `update 表名 set uname=?,pwd=? where id=?`。
+```java
+public int update(Object object, String[] filedNames) {
+    Class cla=object.getClass();
+    TableInfo tableInfo=TableContext.poClassTableMap.get(cla);
+    ColumnInfo primaryKey=tableInfo.getPrimaryKey();
+    List<Object> list=new ArrayList<>();
+    StringBuilder sql =new StringBuilder("update "+tableInfo.getT_name()+" set ");
+
+    for (String fname : filedNames) {
+        Object fvalue=ReflectUtils.invokeGet(fname,object);
+        list.add(fvalue);
+        sql.append(fname+"=?,");
+    }
+    list.add(ReflectUtils.invokeGet(primaryKey.getName(),object));
+    sql.setCharAt(sql.length()-1,' ');
+    sql.append("where ");
+    sql.append(primaryKey.getName()+"=? ");
+    return executeDML(sql.toString(),list.toArray());
 }
 ```
 
