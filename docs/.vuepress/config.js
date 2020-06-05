@@ -117,7 +117,10 @@ module.exports = {
     }
   ],
   [
-    "vuepress-plugin-auto-sidebar",{}
+    "vuepress-plugin-auto-sidebar",
+    {
+      sidebarDepth: 2
+    }
   ],
 ]
 }
