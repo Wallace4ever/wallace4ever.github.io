@@ -421,4 +421,53 @@ public int update(Object object, String[] filedNames) {
 }
 ```
 
+## 编写Query的实现类MySqlQuery：DQL语句
+根据DQL语句的不同，查询的结果可分为多行多列（`List<Javabean>`）、一行多列（`单个Javabean对象`）和一行一列（`单个对象的一个属性Object`）。
+
+:::warning
+当然，这些查询是针对一张表的，而如果需要进行复杂的连表查询，这时TableContext又不能自动生成对应的复合Javabean，则目前可以新建一个vo包，在该包下手动建立一个SpecialVO类封装要查询的所有属性，再调用queryRows方法。
+:::
+
+### 多行多列
+分别使用ResultSet.getMetaDada().getColumnLabel(i)和ResultSet.getObject(i)获取属性名和属性值，根据cla创建该类的实例，并调用该实例的set方法设置对应的属性值，将所有实例存入List当中并返回。
+
+```java
+public List queryRows(String sql, Class cla, Object[] params) {
+    Connection conn=DBManager.getConn();
+    List list=null;
+    ResultSet rs=null;
+    PreparedStatement ps=null;
+    try {
+        ps=conn.prepareStatement(sql);
+        JDBCUtils.handleParams(ps,params);
+        System.out.println(ps);
+        rs=ps.executeQuery();
+
+        ResultSetMetaData metaData=rs.getMetaData();
+        //查询的结果集为多行
+        while (rs.next()) {
+            if (list == null) {
+                list=new ArrayList();
+            }
+            //调用Javabean的无参构造器
+            Object rowObj=cla.newInstance();
+            //多列query如 select username,pwd,age from user where id>? and age >18
+            for (int i = 0; i<metaData.getColumnCount();i++) {
+                String columnName=metaData.getColumnLabel(i+1);
+                Object columnValue=rs.getObject(i+1);
+
+                //调用rowObject的setUsername方法，将columnValue放进去
+                ReflectUtils.invokeSet(rowObj,columnName,columnValue);
+            }
+            list.add(rowObj);
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+    return list;
+}
+```
+
+
+
 未完待续
