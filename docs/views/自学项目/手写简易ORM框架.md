@@ -429,7 +429,7 @@ public int update(Object object, String[] filedNames) {
 :::
 
 ### 多行多列
-分别使用ResultSet.getMetaDada().getColumnLabel(i)和ResultSet.getObject(i)获取属性名和属性值，根据cla创建该类的实例，并调用该实例的set方法设置对应的属性值，将所有实例存入List当中并返回。
+分别使用ResultSet.getMetaDada().getColumnLabel(i)和ResultSet.getObject(i)获取属性名和属性值，根据cla创建该类的实例，并调用该实例的set方法设置对应的属性值，将所有实例存入List当中并返回。多行多列是最核心的，在其基础上剩余的几项都较为容易。
 
 ```java
 public List queryRows(String sql, Class cla, Object[] params) {
@@ -467,7 +467,16 @@ public List queryRows(String sql, Class cla, Object[] params) {
     return list;
 }
 ```
+### 一行多列、一行一列
+只需调用多行多列方法并检验得到的List不为空元素数量大于0时，返回第一个Javabean即可。一行一列和多行多列相比，不要要返回List或者Javabean，只需要返回resultSet.getObject(1)即可。
 
+:::tip
+至此，一个具有简易功能的ORM框架大体上已经写成。下面就要进一步对其进行设计优化、增加数据库连接池、编写文档以及打包发布等操作。
+:::
 
+## Query类设计模式优化：模版方法模式/回调
+审视目前的MySqlQuery，我们可以发现其中很多具体的过程可能也能用于OracleQuery等实现类，所以把这些可以共用的部分挪动到Query中，这时需要将Query改为抽象类。
+
+接下来需要了解Java回调机制。
 
 未完待续
