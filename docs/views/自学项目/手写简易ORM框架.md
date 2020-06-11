@@ -468,15 +468,68 @@ public List queryRows(String sql, Class cla, Object[] params) {
 }
 ```
 ### 一行多列、一行一列
-只需调用多行多列方法并检验得到的List不为空元素数量大于0时，返回第一个Javabean即可。一行一列和多行多列相比，不要要返回List或者Javabean，只需要返回resultSet.getObject(1)即可。
+只需调用多行多列方法并检验得到的List不为空元素数量大于0时，返回第一个Javabean即可。一行一列和多行多列相比，不用要返回List或者Javabean，只需要返回resultSet.getObject(1)即可。
 
 :::tip
 至此，一个具有简易功能的ORM框架大体上已经写成。下面就要进一步对其进行设计优化、增加数据库连接池、编写文档以及打包发布等操作。
 :::
 
-## Query类设计模式优化：模版方法模式/回调
+## Query类设计模式优化：模版方法模式/回调❤
 审视目前的MySqlQuery，我们可以发现其中很多具体的过程可能也能用于OracleQuery等实现类，所以把这些可以共用的部分挪动到Query中，这时需要将Query改为抽象类。
 
-接下来需要了解Java回调机制。
+接下来观察QueryRows(QueryUniqueRow)和QueryValue(QueryNumber)，发现两者中有很多冗余的代码，而在执行DQL语句的过程中流程都是一样的：`获得连接->预编译SQL语句->设置参数->执行并得到结果集->处理结果集并返回特定对象`。其中只有最后一步是需要根据查询的行列数来具体处理的。这时就可以用到**模版方法**模式，将流程骨架放到`executeQueryTemplate(String sql,Object[] params,Class cla,Callback callback)`这一模版方法中，封装好对数据库的访问，而对结果的处理则延迟到具体方法再做。
+
+通常情况下使用模版方法模式是在父类中定义好处理的流程和步骤（即包含了一些具体方法和抽象方法），特定步骤（抽象方法）的具体实现延迟到子类中定义。而在本项目中`executeQueryTemplate`是Query类下的一个方法，方法本身不存在继承的说法，想要抽象出其中的特定步骤延迟到使用时（QueryRows、QueryNumber）再定义，则可以结合回调机制。
+
+首先定义接口或抽象类Callback，其中声明根据查询的行列数来具体处理结果集的方法`public Object doExecute(Connection conn, PreparedStatement ps, ResultSet rs);`（该方法主要对rs进行处理），这时在模版方法中就可以直接调用该接口的doEcecute()方法。接下来就可以在具体方法调用此模版时再给出Callback的实现类（往往是匿名内部类），并返回对rs的处理结果。
+
+```java
+public Object executeQueryTemplate(String sql,Object[] params,Class cla,Callback callback) {
+    Connection conn=DBManager.getConn();
+    ResultSet rs=null;
+    PreparedStatement ps=null;
+    try {
+        ps=conn.prepareStatement(sql);
+        JDBCUtils.handleParams(ps,params);
+        rs=ps.executeQuery();
+        //以上都是固定的流程
+
+        //具体方法调用此模版时再给出Callback的实现类，并返回对rs的处理结果
+        //doExecute()称为钩子方法或回调，由模版方法控制整个过程
+        Object result=callback.doExecute(conn,ps,rs);
+
+        //固定流程
+        rs.close();
+        ps.close();
+        conn.close();
+        return result;
+    } catch (Exception e) {
+        e.printStackTrace();
+        return null;
+    }
+}
+```
+具体方法中使用模版（以QueryValue为例）：
+```java
+public Object queryValue(String sql, Object[] params) {
+    return executeQueryTemplate(sql, params, null, new Callback() {
+        @Override
+        public Object doExecute(Connection conn, PreparedStatement ps, ResultSet rs) {
+            Object value=null;
+            try {
+                while (rs.next()) {
+                    value = rs.getObject(1);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return value;
+        }
+    });
+}
+```
+:::warning
+老师说这里的钩子方法又称为回调，但我查了更多关于回调的知识，感觉这里仅仅是模版方法中对具体实现类的一次普通调用。更多关于Java回调的知识可移步至[Java回调机制](../知海拾贝/Java回调机制.md)。
+:::
 
 未完待续
