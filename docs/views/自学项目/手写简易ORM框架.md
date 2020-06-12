@@ -532,4 +532,122 @@ public Object queryValue(String sql, Object[] params) {
 老师说这里的钩子方法又称为回调，但我查了更多关于回调的知识，感觉这里仅仅是模版方法中对具体实现类的一次普通调用。更多关于Java回调的知识可移步至[Java回调机制](../知海拾贝/Java回调机制.md)。
 :::
 
+## Query类设计模式优化：工厂模式/单例模式/克隆模式
+到目前为止，我们都是自己在Query中建立main方法并手动new一个Query的实现类来进行测试，然而真正在使用时应向用户隐藏实现类的创建逻辑。用户只需要知道Query接口和并配置要使用的数据库类型，就可以从QueryFactory那里得到一个实例。
+
+为此，在db.properties中新增一条queryClass，记录要使用的类。QueryFactory使用单例模式，可以使用反射创建该类的实例：
+```java
+public class QueryFactory {
+    private static QueryFactory factory=new QueryFactory();
+    //私有构造方法，饿汉式单例模式
+    private QueryFactory() {}
+    Class c;
+    static {
+        try {
+            //加载指定的Query类
+            Class c= Class.forName(DBManager.getConf().getQueryClass());
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+    public Query createQuery(){
+        try {
+            return (Query)c.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+    public static QueryFactory getFactory(){
+        return factory;
+    }
+}
+```
+不过每次使用反射创建实例效率可能较低，可使用克隆（原型）模式创建实例。为此需要将Query标记为`implements Cloneable`，在加载工厂类时创建实例，每次调用createQuery时返回实例的一个克隆。
+```java
+public class QueryFactory {
+    private static Query prototypeObj;//原型对象
+    //私有构造方法，单例模式
+    private QueryFactory() {}
+
+    static {
+        try {
+            //加载指定的Query类
+            Class c= Class.forName(DBManager.getConf().getQueryClass());
+            prototypeObj=(Query) c.newInstance();
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static Query createQuery(){
+        try {
+            return (Query) prototypeObj.clone();
+        } catch (CloneNotSupportedException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+}
+```
+
+## 增加数据库连接池
+JDBC建立Connection对象是一个很耗时的操作，因为底层需要创建一个Socket通信。如果用户取数据时每次都创建一个连接，用完后又关闭连接，则效率大大降低。为此，创建连接池，维护一定数量的Connection对象。每次有用户要获得连接时，从池中取出一个Connection对象，使用完后用户并不真正地关闭该对象，而是放回池中供下一个用户使用，这样能够大大提升效率。市面上目前有DBCP、c3p0、proxool等成熟的连接池产品。
+```
+连接池（Connection Pool）
+    ·就是将Connection对象放入List中，反复重用！
+-连接池的初始化：
+    ·事先放入多个连接对象。-从连接池中取连接对象
+    ·如果池中有可用连接，则将池中最后一个返回。同时，将该连接从池中remove，表示正在使用。
+    ·如果池中无可用连接，则创建一个新的。
+-关闭连接
+    ·不是真正关闭连接，而是将用完的连接放入池中。
+```
+将原来DBManager中的getConn()方法中使用JDBC获得新连接的方法重命名为createConn()以供DBConnPool使用，同时将getConn作为从连接池中取连接的方法。
+
+```java
+/**
+ * 初始化连接池，使连接数量达到最小值
+ */
+public void initPool() {
+    if (pool == null) {
+        pool=new ArrayList<>();
+    }
+    while (pool.size() < DBConnPool.POOL_MIN_SIZE) {
+        pool.add(DBManager.createConn());
+        System.out.println("初始化池，连接数为："+pool.size());
+    }
+}
+
+/**
+ * 从连接池中取出一个连接
+ * @return 取出的连接
+ */
+public synchronized Connection getConnection() {
+    int lastIndex=pool.size()-1;
+    Connection conn=pool.get(lastIndex);
+    pool.remove(lastIndex);
+    return conn;
+}
+
+/**
+ * 并不是真正关闭，将连接放回池中
+ * @param conn 要放回的连接
+ */
+public synchronized void close(Connection conn) {
+    if (pool.size() >= POOL_MAX_SIZE) {
+        try {
+            if (conn != null) {
+                conn.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    } else {
+        pool.add(conn);
+    }
+}
+```
+经测试，查询1000次，不加连接池耗时11419ms，增加连接池后耗时2370ms。查询次数增加时差异更加明显。
+
 未完待续
