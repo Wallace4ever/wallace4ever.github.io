@@ -650,4 +650,43 @@ public synchronized void close(Connection conn) {
 ```
 经测试，查询1000次，不加连接池耗时11419ms，增加连接池后耗时2370ms。查询次数增加时差异更加明显。
 
-未完待续
+## 导出jar包并生成API文档
+在IDEA中，打开`Project Structure`，在`Artifacts`中添加`jar/from modules with dependencies`，选择导出的路径，留空`Main Class`并选择`copy to the output directory and link via manifest`。接下来在Output Layout中删去mysql-connector以避免将MySQL驱动包一起加入到导出的jar包中，Type选择Other即可（选择JAR会讲所有output都打入一个jar包）。最后点击菜单中的Build Artifacts即可。
+
+![JAR-3.png](https://wx1.sbimg.cn/2020/06/13/JAR-3.png)
+
+IDEA提供了生成API文档的便捷入口：Tools/Generate Javadoc（当然你也可以手动使用Javadoc.exe）
+
+![API.png](https://wx1.sbimg.cn/2020/06/13/API.png)
+
+在传入的参数中一般写上`-encoding UTF-8 -charset UTF-8 -windowtitle "文档标题"`否则可能出现编码错误。
+
+## 在新项目中使用该框架
+在新项目中导入生成的jar包与MySQL驱动，由于在DBManager中配置过：`properties.load(Thread.currentThread().getContextClassLoader().getResourceAsStream("db.properties"));`，只需要在新项目ClassPath即源文件根目录下以jar中的db.properties为模版再创建一个同名文件，并按照使用者的情况修改配置即可使用。
+
+使用时，执行一次`TableContext.updateJavaPOFile();`即可在项目中创建与使用者数据库相吻合的Javabean，接下来只需要得到Query对象就能执行增删改查的操作。
+
+```java
+import po.Emp;
+import sorm.core.Query;
+import sorm.core.QueryFactory;
+import sorm.core.TableContext;
+
+public class Test {
+    public static void main(String[] args) {
+        //TableContext.updateJavaPOFile();
+        Emp e=new Emp();
+        e.setAge(18);
+        e.setEmpname("王帅");
+        e.setSalary(20000.0);
+        e.setDeptId(1);
+        e.setId(7);
+
+        Query query= QueryFactory.createQuery();
+        query.insert(e);
+        Number n=query.queryNumber("select count(*) from emp where salary>?",new Object[]{6000});
+        System.out.println(n);
+    }
+}
+```
+当然，此框架的功能有着很大的局限性，使用过程中可能还有一些bug，需要在日后进一步处理。
