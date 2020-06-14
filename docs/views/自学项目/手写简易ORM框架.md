@@ -48,7 +48,7 @@ categories:
 首先对应上面的设计，在项目下新建`core`、`bean`、`utils`三个包，用于存放下面的类与接口。在接口中添加增删改查相关的方法。
 ```
 src
-├── po//后面根据数据库表信息自动生成的JavaBean源文件所在的包
+├── po               //后面根据数据库表信息自动生成的JavaBean源文件所在的包
 └── sorm
     ├── bean
     │   ├── ColumnInfo.java
@@ -63,13 +63,41 @@ src
     │   ├── TableContext.java
     │   └── TypeConverter.java
     ├── db.properties
-    ├── Main.java//用于定位db.properties，用线程来定位的方法目前有些问题
+    ├── Main.java    //用于定位db.properties，用线程来定位的方法目前有些问题
     └── utils
         ├── JavaFileUtils.java
         ├── JDBCUtils.java
         ├── ReflectUtils.java
         └── StringUtil.java
 ```
+**6.13补充，最终的文件架构如下：**
+```
+src
+├── db.properties           //解决了定位并获取项目资源文件的问题
+└── sorm
+    ├── bean
+    │   ├── ColumnInfo.java
+    │   ├── Configuration.java
+    │   ├── JavaFieldGetSet.java
+    │   └── TableInfo.java
+    ├── core
+    │   ├── Callback.java   //对Query采用模板方法模式结合回调进行优化
+    │   ├── DBManager.java
+    │   ├── MySqlQuery.java
+    │   ├── MySqlTypeConverter.java
+    │   ├── QueryFactory.java
+    │   ├── Query.java
+    │   ├── TableContext.java
+    │   └── TypeConverter.java
+    ├── pool
+    │   └── DBConnPool.java //连接池，维护一个List保存数据库连接对象
+    └── utils
+        ├── JavaFileUtils.java
+        ├── JDBCUtils.java
+        ├── ReflectUtils.java
+        └── StringUtil.java
+```
+
 
 其中，Query接口定义相关的增删改查方法
 ```java
@@ -649,6 +677,13 @@ public synchronized void close(Connection conn) {
 }
 ```
 经测试，查询1000次，不加连接池耗时11419ms，增加连接池后耗时2370ms。查询次数增加时差异更加明显。
+
+## 框架最终结构UML
+![SORMUML.png](https://wx2.sbimg.cn/2020/06/14/SORMUML.png)
+框架最终大致分为三个部分：
+1. DBConnPool和Configuration作为类变量由DBManager在类加载时维护，供其他类获得数据库连接和配置信息。
+2. TableContext维护两个Map类变量，在类加载时将数据库中所有的表信息ColumnInfo（TableInfo）与表名和类名关联起来，并调用JavaFileUtils创建Po包中的Java源文件（该过程使用了TypeConverter、JavaFieldGetSet、StringUtil）。
+3. 用户通过QueryFactory得到Query来执行SQL语句，Query用到JDBCUtils为Statement设参数。在执行DQL语句时由Po包中的源文件创建对应的对象，并使用ReflectUtils调用该对象的set方法将查询到的值存入对象中并返回；在执行DML语句时（如有必要根据传入的对象使用ReflectUtils调用该对象的get方法）获取类对象和主键来构造SQL语句并执行。
 
 ## 导出jar包并生成API文档
 在IDEA中，打开`Project Structure`，在`Artifacts`中添加`jar/from modules with dependencies`，选择导出的路径，留空`Main Class`并选择`copy to the output directory and link via manifest`。接下来在Output Layout中删去mysql-connector以避免将MySQL驱动包一起加入到导出的jar包中，Type选择Other即可（选择JAR会讲所有output都打入一个jar包）。最后点击菜单中的Build Artifacts即可。

@@ -12,7 +12,7 @@ lang: zh-CN
 # }
 bgImage: cover6.jpg
 bgImageStyle: {
-  height: '400px'
+  height: '350px'
 }
 isShowTitleInHome: false
 actionText: Guide
