@@ -1,5 +1,5 @@
 ---
-title: 手写简易ORM框架
+title: 手写简易ORM框架学习笔记
 date: 2020-06-01
 tags:
  - ORM
