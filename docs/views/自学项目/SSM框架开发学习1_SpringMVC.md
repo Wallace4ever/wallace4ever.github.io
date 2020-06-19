@@ -7,11 +7,11 @@ categories:
  - 自学项目
 ---
 :::tip
-前面学习的手写简易ORM框架的课程让我对对象关系映射有了进一步的理解，接下来学习JavaEE开发中非常典型的SSM框架（Spring MVC、Spring、Mybatis），
+前面学习的手写简易ORM框架的课程让我对对象关系映射有了进一步的理解，接下来学习JavaEE开发中非常典型的SSM框架（Spring MVC、Spring、Mybatis）。
 :::
 <!-- more -->
 
-## MVC设计模式简要回顾
+## MVC设计模式与SpringMVC
 本科阶段的JavaEE课程中使用JSP+Servlet+Javabean的开发模式一般为：
 ```
 1.设计数据库的表结构【实体层，不可见】
@@ -19,6 +19,17 @@ categories:
 3.构建UserDAO：逻辑Bean，处理所有的JDBC操作【数据访问层DAL】（Model）
 4.编写Servlet：处理客户端的请求【业务逻辑层BLL+界面层UI】（Controller）
 5.编写Jsp：获得用户请求、显示反馈结果【界面层UI】（View）
+```
+
+而SpringMVC这一前端框架的功能主要在于：
+```
+* 简化跳转过程的开发: 1客户端请求----2服务器端响应请求----3客户端反馈信息
+* 简化数据的传递处理：
+  1->2 :服务器端要获得客户端提交的数据
+        //以前需要使用request.getParameter()
+        现在只需要通过数据绑定
+  2->3 :需要将反馈信息传给客户端,并显示
+        使用EL表达式+JSTL标签
 ```
 
 ## 开发环境搭建
@@ -189,7 +200,7 @@ pom配置中包含了项目的基本信息，所需依赖和maven构建时用到
   </build>
 ```
 
-## 让SpringMVC跑起来
+## 使用SpringMVC进行跳转
 ### 传统JSP+Servlet+Javabean的处理过程
 在这之前，我们先来看看传统JSP+Servlet+Javabean的处理过程，后面与SpringMVC的处理过程进行比较。
 ```
@@ -218,11 +229,11 @@ pom配置中包含了项目的基本信息，所需依赖和maven构建时用到
 
 使用框架，是为了解决程序员非常讨厌的重复的机械的操作，让程序员尽可能把精力都放在需要思考的逻辑上，从机械工作中解脱出来提高工作效率。软件公司的成本主要是人力成本，编程效率提高了，成本自然降低，生产效率和利润也就提高了。
 
-### 开始使用SpringMVC
+### 使用SpringMVC的跳转流程
 
 Controller类：控制层，一个模块只需要一个Controller，相当于Servlet集合。以用户增删改查为例：
 
-在controller包下新建UserController类，用注解将该类注解为@Controller（org.springframework.stereotype.Controller），并分别为该类和该类下某个处理方法添加@RequestMapping注解。下面的UserController.insert()效果等同于单个Servlet中的service()方法，处理的请求地址为`http://localhost:8080/mvc001/user/add`。
+在controller包下新建UserController类，用注解将该类注解为@Controller（org.springframework.stereotype.Controller），并分别为该类和该类下某个处理方法添加@RequestMapping注解。下面的UserController.insert()效果等同于单个Servlet中的service()方法，处理的请求地址为`http://hostname:8080/mvc001/user/add`。
 ```java
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -252,4 +263,15 @@ public class UserController {
 该过程中请求的处理流程为：
 User_add.jsp中的表单发出post请求->请求被web服务器接收并封装 -> 按照web.xml中的Servlet-mapping被`org.springframework.web.servlet.DispatcherServlet`按照spring-servlet.xml中的配置来处理 -> 按照请求的url根据Request-mapping使用UserController.insert()来处理 -> 指定跳转的页面为User_show（按照spring-servlet.xml中配置的视图解析器被解析为/views/User_show.jsp）
 
-## 套用前端静态模版
+### 练习: 图书管理增删改查模块间的跳转
+
+## 使用SpringMVC进行数据传递：数据绑定
+从客户端到服务器进行参数传递时，常需要绑定的数据类型有：
+1. 基本数据类型的绑定
+2. 包装数据类型的绑定
+3. POJO (实体类)类型的绑定
+4. 复合POJO (实体类)类型的绑定
+5. 数组类型的绑定
+
+***
+***未完待续***
