@@ -17,7 +17,7 @@ categories:
 1.设计数据库的表结构【实体层，不可见】
 2.构建POJO：模型Bean【数据访问层DAL】（Model）
 3.构建UserDAO：逻辑Bean，处理所有的JDBC操作【数据访问层DAL】（Model）
-4.编写Servlet：处理客户端的请求【业务逻辑层BLL+界面层UI】（Controller）
+4.编写Servlet：处理客户端的请求【业务逻辑层BLL】（Controller）
 5.编写Jsp：获得用户请求、显示反馈结果【界面层UI】（View）
 ```
 
@@ -264,6 +264,72 @@ public class UserController {
 User_add.jsp中的表单发出post请求->请求被web服务器接收并封装 -> 按照web.xml中的Servlet-mapping被`org.springframework.web.servlet.DispatcherServlet`按照spring-servlet.xml中的配置来处理 -> 按照请求的url根据Request-mapping使用UserController.insert()来处理 -> 指定跳转的页面为User_show（按照spring-servlet.xml中配置的视图解析器被解析为/views/User_show.jsp）
 
 ### 练习: 图书管理增删改查模块间的跳转
+为了美观大方任意使用一个带样式的前端模版，修改增删改查相应的jsp文件（增：Book_add.jsp，显示增加的书籍：Book_show.jsp； 分页查+删除：Book_list.jsp()，显示删除的结果：message.jsp；单独查：Book_search.jsp）。并建立BookController类，注解@Controller与@RequestMapping到对应的方法，在jsp表单中action和超链接中填入对应的请求地址以实现跳转。
+
+确保jsp文件头有下面的代码：
+```html
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%
+  String path=request.getContextPath();
+  String basePath=request.getScheme()+"://"+request.getServerName()+":"+request.getServerPort()+path+"/";
+%>
+```
+第一行是声明字符编码，后者是为了避免客户端访问RequestMapping的地址同时又使用相对路径来访问资源可能造成的资源获取不到的问题。要想确保资源文件路径正确，可使用ContextPath拼接协议、主机、端口来得到资源的绝对路径：
+```html
+<!-- 即http://localhost:8080/mvc001/views/js/jquery.js -->
+<script src="<%=basePath%>views/js/jquery.js"></script>
+```
+**绝对路径解释：**
+
+例如IDEA项目名为`mvclearn01`，编译生成的war exploded目录结构为：
+
+![war-exploded.png](https://wx1.sbimg.cn/2020/06/20/war-exploded.png)
+
+上面的`request.getContextPath()`是在开发Web项目时经常用到的方法，可返回`web项目的根路径名`。在部署时设置项目在Tomcat中的Application Context为`“mvc001”`，则`request.getContextPath()`的结果为`“/mvc001”`，对应的是项目编译后输出的`/mvclearn01`目录。
+
+相对应地，`http://localhost:8080/mvc001`是项目部署的basePath，其中除了META-INF和WEB-INF不能直接访问之外，剩下的都对应源代码中webapp下开发者创建的结构，可以通过绝对路径访问。
+
+下面的两个绝对路径是等价的：
+
+`http://localhost:8080/mvc001`+`/views/Book_add.jsp`
+
+`http://localhost:8080/mvc001`+`/book/addBook`
+
+前者也经过了RequestMapping但是没有匹配的方法，所以直接请求jsp得到其中包含的html（如果把某方法的RequestMapping配置成`/Book_add.jsp`并请求`/book/Book_add.jsp`其实也会报404而不会调该方法，所以不要把方法的RequestMapping命名为`XX.jsp`这样有歧义的名字）；
+
+后者是被springMVC通过RequestMapping映射到了BookController.add()，只不过该方法目前没有对请求作进一步处理，仅仅是将返回的view设为了Book_add.jsp（发生了一次请求转发或者说服务器端跳转，浏览器地址栏仍然是/book/addBook，但实际拿到的html是Book_add.jsp返回的）。
+
+我们目前编写的jsp,css,js等文件都在views目录下，所以使用绝对路径（形如basePath+/views/XXX.jsp或basePath+/views/js/jquery.js）是最稳妥的方案。
+
+**相对路径解释：**
+
+:::warning
+资源的相对路径是浏览器作客户端跳转时基于当前的网页地址推断出来的，和开发时的项目组织结构没有必然的联系！
+:::
+
+以上面的两个绝对路径为例，分别访问它们，响应的都是相同的html内容，假设其中包含了：
+```html
+<script src="js/jquery.js"></script>
+```
+对于前一个路径`http://localhost:8080/mvc001/views/Book_add.jsp`，浏览器推断/Book_add.jsp是当前资源，/views是资源所在目录，则该js文件的真实路径为（没有问题，可以正常获取）：
+
+![1.png](https://wx2.sbimg.cn/2020/06/20/1.png)
+
+对于后一个路径`http://localhost:8080/mvc001/book/addBook`，浏览器推断/book是资源所在目录，因而得出该js文件的真实路径为：
+
+![2.png](https://wx2.sbimg.cn/2020/06/20/2.png)
+
+而/book并不是项目下真实存在的目录，只是我们为BookController注册的RequestMapping，所以资源会获取失败。其实对于通过RequestMapping的访问方式并不是不能使用相对路径，可以修改为下面相对路径来实现资源的获取。
+
+和UNIX文件系统中的表示相同，`../views/js/jquery.js`表示当前目录（/book）的上层目录（/mvc001）下的`/views/js/jquery.js`资源。
+```html
+<script src="../views/js/jquery.js"></script>
+```
+![3.png](https://wx2.sbimg.cn/2020/06/20/3.png)
+
+尽管可以在修改后用相对路径访问到目标资源，但如果开发中同时存在上面访问资源的两种方式，尽量还是使用绝对路径以免混淆。
+
+另外，`./js/jquery.js`等价于`js/jquery.js`，`/js/jquery.js`表示从web服务器根目录开始`http://localhost:8080/js/jquery.js`。要注意区分它们的区别。
 
 ## 使用SpringMVC进行数据传递：数据绑定
 从客户端到服务器进行参数传递时，常需要绑定的数据类型有：
