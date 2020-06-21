@@ -339,5 +339,188 @@ User_add.jsp中的表单发出post请求->请求被web服务器接收并封装 -
 4. 复合POJO (实体类)类型的绑定
 5. 数组类型的绑定
 
+### 基本数据类型的绑定
+要从表单中获取各种基本数据类型，只需要：
+1. 将参数放在Controller执行方法的参数列表中
+2. 保证数据类型兼容，同时参数名与表单中对应项的name保持一致
+```java
+@Controller
+@RequestMapping("/data")
+public class DataController {
+    @RequestMapping("/test1")
+    //要获得基本数据类型，只需要将其作为处理方法的参数
+    public ModelAndView test1(int n,double d,char ch,boolean b) {
+        System.out.println("Integer is "+n);
+        System.out.println("Double is "+d);
+        System.out.println("Char is "+ch);
+        System.out.println("Boolean is "+b);
+        ModelAndView mv=new ModelAndView();
+        mv.setViewName("data/hello");
+        return mv;
+    }
+}
+```
+
+### 包装数据类型的绑定
+springMVC提供了自动的数据类型转换，String -> 基本数据类型：
+
+`<input type="text" value="10" name="n">` -> int n = 10;
+
+但是如果得到的String值是错误的，如空串和其他格式错误值，就会引发数据类型的转换错误。
+
+例如，在上面的Controller执行方法中，表单封装在post请求中的参数可以涵盖并超过该方法的参数，但是一旦执行方法的参数在请求中找不到，就会尝试将其转为null。然而基本类型不可以转为null，只有引用类型才可以。这时就会引发500服务器内部错误。
+
+针对格式错误的问题，可以在客户端使用js检查用户输入是否正确，也可以采用包装类型避免该错误。
+```java
+    @RequestMapping("/test2")
+    public ModelAndView test2(Integer n,Double d,Character ch,Boolean b,String s) {
+        System.out.println("Integer is "+n);
+        System.out.println("Double is "+d);
+        System.out.println("Char is "+ch);
+        System.out.println("Boolean is "+b);
+        System.out.println("String is "+s);
+        ModelAndView mv=new ModelAndView();
+        mv.setViewName("data/hello");
+        return mv;
+    }
+```
+在输入为空值时，客户端和服务器都不会报错，控制台输出：
+```
+Integer is null
+Double is null
+Char is null
+Boolean is null
+String is 
+```
+在输入格式错误的值时，服务器抛出MethodArgumentTypeMismatchException，客户端收到http400错误的请求。
+
+### POJO（实体类）的绑定
+没有逻辑关系的数据，可以通过基本数据类型或者包装数据类型获取。但对于有逻辑关系的数据，就需要将其封装到一个pojo中。
+
+在之前学习Servlet时，开发者每次需要手动获得数据的值，并封装到对象。而SpringMVC提供了相应的解决方案。
+
+首先建立pojo类，例如User类，封装以下属性并添加get/set方法。
+```java
+private String name;
+private String pwd;
+private int age;
+private double height;
+```
+接下来在对应的表单中提交对应的值。注意表单中的变量名要和User类的属性名相同，表单提交的数据类型也要能匹配User类的对应属性类型。
+```html
+<form method="post" action="<%=basePath%>user/addUser">
+    <p>用户名：<input type="text"  name="name"></p>
+    <p>密码：<input type="text"  name="pwd"></p>
+    <p>年龄：<input type="text"  name="age"></p>
+    <p>身高：<input type="text"  name="height"></p>
+    <p><input type="submit" value="提交"></p>
+</form>
+```
+在Controller执行方法的参数中传入该User对象即可直接使用，SpringMVC已经完成了获取值并封装到对象的过程。
+```java
+@RequestMapping("addUser")
+public ModelAndView add(User user) {
+    System.out.println(user);
+    ModelAndView mv=new ModelAndView();
+    mv.setViewName("data/hello");
+    return mv;
+}
+```
+
+### 复合POJO类型的绑定
+考虑一个一对多的关系：学籍管理——Classes->Student，创建对应的类并添加get/set方法，重写toString方法。
+```
+Classes:                Student:
+name                    name
+count                   sex
+year                    age
+dept                    number
+                        birthday
+                        Classes cl
+```
+在表单中注册学生这一复合pojo时，除了基本的属性，还需要通过`对象名.属性名`来输入学生持有的cl对象的属性：
+```html
+<input type="text" class="input" name="cl.name" value="" />
+```
+全部输入后，后端就能在参数中直接使用Student对象：
+Student{name='lisi', sex='男', age=18, num='231231', cl=Classes{name='一班', count=34, year=2018, dept='计算机'}}
+
+### 数组类型的绑定
+Student类新增一个属性`private String[] hobby;`与相应的get/set方法，对应的html中需要增加一个checkBox多选按钮。
+```html
+<div class="field">
+  <input type="checkbox"  name="hobby" value="骑马" />骑马
+  <input type="checkbox"  name="hobby" value="弹琴" />弹琴
+  <input type="checkbox"  name="hobby" value="乒乓球" />乒乓球
+  <input type="checkbox"  name="hobby" value="篮球" />篮球
+</div>
+```
+保持表单中checkbox与pojo属性中数组名一致即可。
+
+### 数据类型绑定中的一些注意点
+* 尽管在jsp头部声明了`charset=utf-8`可以让浏览器以UTF-8来解码，但在浏览器中提交数据时仍服务端若不设置解码格式则也会出现中文乱码，为此在web.xml中统一使用过滤器：
+  ```xml
+  <!--配置编码方式过滤器，注意要配置在所有过滤器前面-->
+  <filter>
+    <filter-name>CharacterEncodingFilter</filter-name>
+    <filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+    <init-param>
+      <param-name>encoding</param-name>
+      <param-value>utf-8</param-value>
+    </init-param>
+  </filter>
+
+  <filter-mapping>
+    <filter-name>CharacterEncodingFilter</filter-name>
+    <url-pattern>/*</url-pattern>
+  </filter-mapping>
+  ```
+* 来自前端请求中的属性，可以自动封装在pojo对象中获取，也可以直接在参数中指定获取：
+  ```java
+  @RequestMapping("/add")
+  public ModelAndView addStudent(Student student,String[] hobby) {
+      System.out.println(student);
+      System.out.println("hobby"+ Arrays.toString(hobby));
+      ModelAndView mv=new ModelAndView();
+      mv.setViewName("/data/hello");
+      return mv;
+  }
+  ```
+* Date类型的绑定：由于SpringMVC没有提供Date类型的自动绑定，所以需要我们自己定义由String类型到Date类型的转换器：
+  ```java
+  package util;
+  import java.text.ParseException;
+  import java.text.SimpleDateFormat;
+  import java.util.Date;
+  import org.springframework.core.convert.converter.Converter;
+
+  //需要实现Converter接口，这里是将String类型转换成Date类型
+  public class DateConverter implements Converter<String, Date> {
+      @Override
+      public Date convert(String source) {
+          //实现将字符串转成日期类型(格式是yyyy-MM-dd HH:mm:ss)
+          SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+          try {
+              return dateFormat.parse(source);
+          } catch (ParseException e) {
+              e.printStackTrace();
+          }
+          //如果参数绑定失败返回null
+          return null;
+      }
+  }
+  ```
+  接下来在spring-servlet.xml中注册该配置转换器的conversion-service：
+  ```xml
+  <mvc:annotation-driven conversion-service="conversionService"/>
+
+  <bean id="conversionService" class="org.springframework.format.support.FormattingConversionServiceFactoryBean">
+      <property name="converters">
+          <!-- 自定义转换器的类名 -->
+          <bean class="util.DateConverter"/>
+      </property>
+  </bean>
+  ```
+  现在，在前端提交的birthday属性，如果格式与转换器内设置的日期类型一致就可以正确转为Date类型。某些特殊的类型转换也可以使用这种方式实现自定义转换。
 ***
 ***未完待续***
