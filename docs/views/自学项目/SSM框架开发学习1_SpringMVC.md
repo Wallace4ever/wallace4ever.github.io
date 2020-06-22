@@ -25,11 +25,22 @@ categories:
 ```
 * 简化跳转过程的开发: 1客户端请求----2服务器端响应请求----3客户端反馈信息
 * 简化数据的传递处理：
-  1->2 :服务器端要获得客户端提交的数据
-        //以前需要使用request.getParameter()
-        现在只需要通过数据绑定
-  2->3 :需要将反馈信息传给客户端,并显示
-        使用EL表达式+JSTL标签
+  1:客户端请求：form、url
+    //以前按照servlet-mapping请求对应servlet中的service()
+    现在通过Controller/method
+  2:服务端处理请求：
+    1）服务器端要获得客户端提交的数据
+      //以前需要使用request.getParameter()
+      现在只需要通过数据绑定
+    2）处理请求，可以结合Mybatis数据库操作
+    3）得到结果并跳转
+  3:将反馈信息传给客户端,并显示
+    1）取出信息
+      //以前通过request
+      现在通过EL表达式
+    2）显示信息
+      //以前通过jsp标签
+      现在使用EL表达式+JSTL标签
 ```
 
 ## 开发环境搭建
@@ -522,5 +533,78 @@ Student类新增一个属性`private String[] hobby;`与相应的get/set方法�
   </bean>
   ```
   现在，在前端提交的birthday属性，如果格式与转换器内设置的日期类型一致就可以正确转为Date类型。某些特殊的类型转换也可以使用这种方式实现自定义转换。
+
+## EL表达式
+表达式是一种有结果的算式（常量、变量），EL（Expression Language）表达式语言，可以简化对变量对象的访问。以前为了在返回的html中显示特定结果，需要使用jsp表达式`<%=%>`，还是没有做到彻底地将逻辑和显示分开。
+
+EL表达式用于以下情形
+* 静态文本
+* 标准标签和自定义标签
+* EL不能在脚本元素中使用
+
+### EL表达式语言的语法
+* `${EL Expression}`所有的表达式以`${`开始,以`}`结束。
+
+#### 访问常量
+```html
+<h1>常量</h1>
+<br>整数：${10}
+<br>小数：${10.3}
+<br>char：${'W'}
+<br>bool：${true}
+<br>字符串：${"hello"}
+```
+#### 算数运算
+EL表达式中除的结果为实数
+```html
+<h1>算数运算</h1>
+<br>12+3=${12+3}
+<br>12-3=${12-3}
+<br>12*3=${12*3}
+<br>12/3=${12/3}
+<br>12%3=${12%3}
+```
+#### 关系运算与逻辑运算
+EL表达式同样支持`= != < > <= >=`这几种关系运算和`&& || !`这几种逻辑运算。
+
+注意:在使用EL关系运算符时,不能够写成：
+```
+${param.password1} = = ${param.password2}或者
+${ ${param.password1 }= = ${ param.password2 } }
+```
+而应写成：
+```
+${ param.password1 = = param.password2 }
+```
+逻辑运算示例：`${(12= =3)&&(12!=3)}`
+
+#### 变量
+EL在对表达式中的变量进行操作的时候，它通过`pageContext.findAttribute()`的方式来查找变量,依次从`page,request,session,application`域(容器)中开始查找,如果这几个范围都没有找到则返回`null` ,也可以指定在特定的域中查找。Application容器是公共容器，慎重使用。
+
+| 属性范围 | 在EL中的名称 | 作用范围 |
+|:-:|:-:|:-:|
+|Page|PageScope|页面中有效|
+|Request|RequestScope|一次访问有效|
+|Session|SessionScope|一次会话有效|
+|Application|ApplicationScope|一次项目启动有效
+
+使用EL表达式替代jsp表达式的取值示例（page容器中放数据没太大意义servlet API 4.0之后就不支持）：
+```html
+<h1>从不同的容器中取出数据</h1>
+<%
+    request.setAttribute("s1","hello request");
+    session.setAttribute("s2","hello session");
+    application.setAttribute("s3","hello application");
+%>
+<br>从request中取出变量：<br>
+${requestScope.s1} ||| <%=request.getAttribute("s1")%>
+<br>从session中取出变量：<br>
+${sessionScope.s2} ||| <%=session.getAttribute("s2")%>
+<br>从application中取出变量：<br>
+${applicationScope.s3} ||| <%=application.getAttribute("s3")%>
+```
+如果三个容器中存在同名变量`s`，而访问的时候不指明在哪个容器中取值`${s}`，则取值的顺序如下：page,request,session,application，都没有找到则不显示。
+
+
 ***
 ***未完待续***
