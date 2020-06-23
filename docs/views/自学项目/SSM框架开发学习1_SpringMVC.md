@@ -583,14 +583,15 @@ EL在对表达式中的变量进行操作的时候，它通过`pageContext.findA
 
 | 属性范围 | 在EL中的名称 | 作用范围 |
 |:-:|:-:|:-:|
-|Page|PageScope|页面中有效|
-|Request|RequestScope|一次访问有效|
-|Session|SessionScope|一次会话有效|
-|Application|ApplicationScope|一次项目启动有效
+|page|pageScope|页面中有效|
+|request|requestScope|一次访问有效|
+|session|sessionScope|一次会话有效|
+|application|applicationScope|一次项目启动有效
 
-使用EL表达式替代jsp表达式的取值示例（page容器中放数据没太大意义servlet API 4.0之后就不支持）：
+使用EL表达式从不同容器中取值示例：
 ```html
 <h1>从不同的容器中取出数据</h1>
+<!--page容器中放数据没太大意义servlet API 4.0之后就不支持-->
 <%
     request.setAttribute("s1","hello request");
     session.setAttribute("s2","hello session");
@@ -605,6 +606,111 @@ ${applicationScope.s3} ||| <%=application.getAttribute("s3")%>
 ```
 如果三个容器中存在同名变量`s`，而访问的时候不指明在哪个容器中取值`${s}`，则取值的顺序如下：page,request,session,application，都没有找到则不显示。
 
+`.`和`[]`的用法，类似java。
+```html
+<%
+    Classes cla = new Classes("1班",36,2018,"计算机");
+    Student stu= new Student("张三","男",19,"184362",new String[]{"骑马","射箭"},null,cla);
+    request.setAttribute("stu",stu);
+%>
+<br>从request容器显示学生信息：${requestScope.stu}
+<br>显示学生的信息：${stu}
+<br>显示学生名：${stu.name}
+<br>显示班级名：${stu.cl.name}
+<br>显示学生第1个爱好：${stu.hobby[0]}
+```
 
+### EL中的隐含对象
+EL中的隐含对象共有11个，包括：与范围有关的隐含对象、与输入有关的隐含对象、其他隐含对象。
+
+#### 1.范围有关对象包括：
+```
+pageScope：返回页面范围的变量名,这些名称已映射至相应的值
+requestScope：返回对请求对象的属性的访问权限
+sessionScope：返回会话范围的变量名,这些名称映射至相应的值
+applicationScope：返回应用范围内的变量,并将变量名映射至相应的值
+```
+他们类似于jsp的pageContext、request、session和application一样，不过只能用于获取属性值，没有其他相关方法。
+
+#### 2.与输入有关的隐含对象包括：
+```
+param：返回客户端的请求参数的字符串值
+paramValues：返回映射至客户端的请求参数的一组值（例如checkbox）
+```
+`${param.name}`等价于`request.getParameter(String name)`；
+`${paramValues.name}`等价于`request.getParameterValues(String name)`
+
+#### 3.其他隐含对象包括：
+```
+pageContext：提供对页面属性的访问
+header：返回一个请求标题名称,然后将该值映射至单个字符串值
+headerValues：返回映射至请求标题的一组值
+initParam：返回映射至单个值的上下文初始化参数名称
+cookie：返回映射至单个Cookie对象的Cookie名称
+```
+cookie是以key-value的方式将Session Tracking的内容记录在文本文件内。EL没有实现cookie的动作，只是简单地把cookie中保存的值取出给开发者使用。例如：`${cookie.userName}`取出保存的userName信息。
+
+header和headerValues用于取出http请求头包含的相关信息，例如`${header["User-Agent"]}`，很少情况下同一标头名拥有不同的值，这时改用headerValues。
+
+initParam用于取得web项目中web.xml中的`<context-param>`配置，例如：
+```xml
+<Context-param>
+<param-name>userid</param-name>
+<param-value>mike</param-value>
+</context-param>
+```
+该配置参数可以使用`${initParam.userid}`来获取，等同于`(String) application.getInitParameter("userid");`。
+
+pageContext主要用来获得请求与页面的详细信息：
+|Expression|Description|
+|:-|:-|
+|$ {pageContext.request.queryString}|取得请求的参数字符串|
+|$ {pageContext.request.requestURL}|取得请求的URL， 但不包括请求之参数字符串|
+|$ {pageContext.request.contextPath}|服务的web application的名称|
+|$ (pageContext.request.method}|取得HTTP的方法(GET、 POST)|
+|$ {pageContext.request.protocol}|取得使用的协议(HTTP/1.1. HTTP/1.0)|
+|$ {pageContext.request.remoteUser}|取得用户名称|
+|$ {pageContext.request.remoteAddr }|取得用户的IP地址|
+|$ {pageContext.session.new}|判断session是否为新的(刚产生而client尚未使用)|
+|$ {pageContext.session.id}|取得session的ID|
+|$ (pageContext.servletContext.serverInfo}|取得主机端的服务信息|
+
+### EL的保留字
+and or not eq ne lt gt le ge true false null empty div mod
+
+### 总结
+- 显示常量
+- 显示变量(四大容器中的变量)
+- 计算(算数、逻辑、关系)
+- 11个隐含对象
+  - 范围, 4
+  - 取值,2
+  - 其他，5
+
+结合SpringMVC与EL，在Controller的处理方法中为ModelAndView添加Model信息。
+```java
+@Controller
+@RequestMapping("/student")
+public class StudentController {
+    @RequestMapping("/add")
+    public ModelAndView addStudent(Student student) {
+        ModelAndView mv=new ModelAndView();
+        //相当于request.setAttribute("stu",student)
+        mv.addObject("stu",student);
+        mv.setViewName("data/Student_show");
+        return mv;
+    }
+}
+```
+这样在请求转发的jsp中就可以使用EL直接取出数据：
+```html
+<h1>学生信息如下</h1>
+<br><%=request.getParameter("name")%>
+
+<br>${requestScope.stu}
+<br>${requestScope.stu.name}
+<br>${stu.name}
+```
+如果不经`Controller.addObject()`就只有在Servlet中先`request.setAttribute(String,Object)`才能在EL中获得数据；或使用`${param.name}`不过那样只能获取单个属性而不能获得封装好的Student对象。前者需要经过Controller，后者可以直接请求jsp而不通过Controller。
 ***
 ***未完待续***
