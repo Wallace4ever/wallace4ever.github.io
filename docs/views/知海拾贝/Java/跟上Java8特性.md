@@ -1,11 +1,16 @@
 ---
-title: 跟上Java8
-date: 2020-06-22
+title: Java8的λ表达式与stream API
+date: 2020-06-24
 tags:
  - Java
 categories:
  - 知海拾贝
 ---
+:::tip
+JDK1.8新增的λ表达式与stream API是颗很甜的语法糖，能够让某些场景下的代码变得更简洁。结合函数式编程、行为参数化的思想与模板方法模式来学习能有更深的理解。
+:::
+<!-- more -->
+
 
 ## JDK1.5~1.8发展简要回顾
 ### JDK5
@@ -168,7 +173,7 @@ java.util.function中定义了许多函数式接口，例如`Predicate<T>`、`Co
 Predicate<String> nonEmptyStringPredicate = (String s) -> !s.empty();
 List<String> nonEmpty = filter(listOFStrings, nonEmptyStringPredicate);
 ```
-## Java 8中的常用函数式接口
+### Java 8中的常用函数式接口
 
 | 函数式接口 | 函数描述符 | 原始类型特化 |
 |:-----:|:--------:|:-------|
@@ -182,7 +187,7 @@ List<String> nonEmpty = filter(listOFStrings, nonEmptyStringPredicate);
 | `BiConsumer<T,U>` | `(T,U) -> void` | `ObjIntConsumer<T>, ObjLongConsumer<T>, ObjDoubleConsumer<T>` |
 | `BiFunction<T,U,R>` | `(T,U) -> R` | `ToIntBiFunction<T,U>, ToLongBiFunction<T,U>, ToDoubleBiFunction<T,U>` |
 
-## Lambdas及函数式接口的例子
+### Lambdas及函数式接口的例子
 
 | 使用案例 | Lambda 的例子 | 对应的函数式接口 |
 |:-----:|:--------|:-------|
