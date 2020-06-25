@@ -712,5 +712,78 @@ public class StudentController {
 <br>${stu.name}
 ```
 如果不经`Controller.addObject()`就只有在Servlet中先`request.setAttribute(String,Object)`才能在EL中获得数据；或使用`${param.name}`不过那样只能获取单个属性而不能获得封装好的Student对象。前者需要经过Controller，后者可以直接请求jsp而不通过Controller。
+
+## JSTL标签库
+使用JSTL（JavaServerPages Standard Tag Library）是为了实现页面无脚本（没有`<%%>`，没有java元素），JSTL：提供了一组标准标签，可用于编写各种JSP动态页面，也可用于访问数据库。
+
+JSTL标准标签库包含了核心标签库、XML库、格式化库、SQL标签库和函数库，我们目前主要学习核心标签库，包括：
+* 通用标签（基本的输入输出，参考request/session/application.get/set/removeAttribute）
+  * set
+  * remove
+  * out
+  * catch
+* 流程控制标签（分支控制）
+  * if
+  * choose
+  * when
+  * otherwise
+* 迭代标签着（循环控制）
+  * foreach
+
+### 在JSP中使用JSTL
+要使用JSTL，在JSP开头加入如下声明
+```html
+<!-- 1.引入标签库，声明别名为c -->
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix:"c"%>
+```
+接下来在JSP中就可以使用标签。
+
+### 通用标签：
+```html
+<p>使用基本标签set设置属性，等价于request.setAttribute("",Object)</p>
+<c:set var="s" value="Hello request" scope="request"/>
+<c:set var="s" value="Hello session" scope="session"/>
+<c:set var="s" value="Hello application" scope="application"/>
+
+<p>使用基本标签out结合EL显示属性</p>
+<br>${s}
+<c:out value="${s}"></c:out>
+
+<p>使用基本标签remove删除属性</p>
+<c:remove var="s" scope="request"></c:remove>
+```
+### 流程控制标签
+双分支：假设要判断请求中提交的一个成绩，>=90为优秀，>=80为中等。JSTL if标签中的test需要是一个布尔值，由EL取值并运算获得，并可以进一步命名该布尔值并放到容器中。if标签内的内容只有在布尔值为true的情况下才会显示
+```html
+<c:if test="${param.grade>=60}" var="isGood" scope="request">
+    成绩及格了！(等价于：)
+    <c:out value="成绩及格了！"/>
+</c:if>
+<p>isGood=${isGood}</p>
+```
+
+多分支：`choose`标签通常和`when`和`otherwise`一同使用，多个`when`标签并不是多个并列的if，而是相当于`if...else if ...else if ...`，最后的`otherwise`相当于最后的`else`。
+```html
+<c:choose>
+    <c:when test="${param.grage>=90}">
+        <h5>${param.grade}属于优秀</h5>
+    </c:when>
+    <c:when test="${param.grage>=80}">
+        <h5>${param.grade}属于良好</h5>
+    </c:when>
+    <c:when test="${param.grage>=70}">
+        <h5>${param.grade}属于中等</h5>
+    </c:when>
+    <c:when test="${param.grage>=60}">
+        <h5>${param.grade}属于及格</h5>
+    </c:when>
+    <c:otherwise>
+        <h5>${param.grade}属于不及格</h5>
+    </c:otherwise>
+</c:choose>
+```
+### 迭代标签
+
+
 ***
 ***未完待续***

@@ -197,5 +197,12 @@ List<String> nonEmpty = filter(listOFStrings, nonEmptyStringPredicate);
 | 从一个对象中选择/提取 | `(int a, int b) -> a * b` | `IntBinaryOperator` |
 | 比较两个对象 | `(Project p1, Project p2) -> p1.getStars().compareTo(p2.getStars())` | `Comparator<Project> 或 BiFunction<Project, `  `Project, Integer> 或 ToIntBiFunction<Project, Project>` |
 
+## lambda进阶
+### 方法引用
+
+### 构造函数引用
+
+### 类型检查
+
 ***
 **未完待续**
