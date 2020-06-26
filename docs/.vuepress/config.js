@@ -50,7 +50,7 @@ module.exports = {
           },
           {
             "text": "邮箱",
-            "link": "mailto://xpkllp@hotmail.com",
+            "link": "mailto://pkxu@seu.edu.cn",
             "icon": "reco-mail"
           }
         ]

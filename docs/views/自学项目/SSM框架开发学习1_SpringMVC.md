@@ -11,7 +11,7 @@ categories:
 :::
 <!-- more -->
 
-## MVC设计模式与SpringMVC
+## MVC设计模式与Spring MVC
 本科阶段的JavaEE课程中使用JSP+Servlet+Javabean的开发模式一般为：
 ```
 1.设计数据库的表结构【实体层，不可见】
@@ -21,7 +21,7 @@ categories:
 5.编写Jsp：获得用户请求、显示反馈结果【界面层UI】（View）
 ```
 
-而SpringMVC这一前端框架的功能主要在于：
+而Spring MVC这一前端框架的功能主要在于：
 ```
 * 简化跳转过程的开发: 1客户端请求----2服务器端响应请求----3客户端反馈信息
 * 简化数据的传递处理：
@@ -90,7 +90,7 @@ tomcat貌似好心办了坏事，明明想解决乱码问题，却造成了乱�
 war exploded模式是直接把文件夹、jsp页面 、classes等等移到Tomcat 部署文件夹里面，进行加载部署。因此这种方式支持热部署，一般在开发的时候也是用这种方式。
 :::
 
-## 认识SpringMVC 配置
+## 认识Spring MVC 配置
 修改在webapp/web-inf下的web.xml，resources目录下的spring-servlet.xml和整个项目的pom.xml。修改完pom.xml中的peoperties和dependencies后maven会提示导入修改后添加的依赖。
 
 ### web.xml配置
@@ -183,7 +183,7 @@ pom配置中包含了项目的基本信息，所需依赖和maven构建时用到
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>1.7</maven.compiler.source>
     <maven.compiler.target>1.7</maven.compiler.target>
-    <springMVC_version>5.2.6.RELEASE</springMVC_version>
+    <Spring MVC_version>5.2.6.RELEASE</Spring MVC_version>
   </properties>
 
   <!--定义了该项目使用的所有依赖的jar包-->
@@ -211,9 +211,9 @@ pom配置中包含了项目的基本信息，所需依赖和maven构建时用到
   </build>
 ```
 
-## 使用SpringMVC进行跳转
+## 使用Spring MVC进行跳转
 ### 传统JSP+Servlet+Javabean的处理过程
-在这之前，我们先来看看传统JSP+Servlet+Javabean的处理过程，后面与SpringMVC的处理过程进行比较。
+在这之前，我们先来看看传统JSP+Servlet+Javabean的处理过程，后面与Spring MVC的处理过程进行比较。
 ```
 客户端->服务器->客户端
 
@@ -236,11 +236,11 @@ pom配置中包含了项目的基本信息，所需依赖和maven构建时用到
     3. DAO方法：insert需要根据pojo对象的属性生成相应的SQL语句，get需要将得到的查询记录封装成pojo对象，等等……在对象属性较多时会比较繁杂。
     4. 跳转：每次跳转只有打开servlet后才能知道该次访问去向何方
 ```
-框架的出现解决了上面的痛点。SpringMVC是一个前端框架，解决了2.1、2.2的工作；MyBatis是持久层框架，解决了2.3的工作，使得开发者操作数据库只需要提供SQL语句就可以了；Spring框架目前可以理解成一个粘合剂把两者组织到一起。
+框架的出现解决了上面的痛点。Spring MVC是一个前端框架，解决了2.1、2.2的工作；MyBatis是持久层框架，解决了2.3的工作，使得开发者操作数据库只需要提供SQL语句就可以了；Spring框架目前可以理解成一个粘合剂把两者组织到一起。
 
 使用框架，是为了解决程序员非常讨厌的重复的机械的操作，让程序员尽可能把精力都放在需要思考的逻辑上，从机械工作中解脱出来提高工作效率。软件公司的成本主要是人力成本，编程效率提高了，成本自然降低，生产效率和利润也就提高了。
 
-### 使用SpringMVC的跳转流程
+### 使用Spring MVC的跳转流程
 
 Controller类：控制层，一个模块只需要一个Controller，相当于Servlet集合。以用户增删改查为例：
 
@@ -308,7 +308,7 @@ User_add.jsp中的表单发出post请求->请求被web服务器接收并封装 -
 
 前者也经过了RequestMapping但是没有匹配的方法，所以直接请求jsp得到其中包含的html（如果把某方法的RequestMapping配置成`/Book_add.jsp`并请求`/book/Book_add.jsp`其实也会报404而不会调该方法，所以不要把方法的RequestMapping命名为`XX.jsp`这样有歧义的名字）；
 
-后者是被springMVC通过RequestMapping映射到了BookController.add()，只不过该方法目前没有对请求作进一步处理，仅仅是将返回的view设为了Book_add.jsp（发生了一次请求转发或者说服务器端跳转，浏览器地址栏仍然是/book/addBook，但实际拿到的html是Book_add.jsp返回的）。
+后者是被Spring MVC通过RequestMapping映射到了BookController.add()，只不过该方法目前没有对请求作进一步处理，仅仅是将返回的view设为了Book_add.jsp（发生了一次请求转发或者说服务器端跳转，浏览器地址栏仍然是/book/addBook，但实际拿到的html是Book_add.jsp返回的）。
 
 我们目前编写的jsp,css,js等文件都在views目录下，所以使用绝对路径（形如basePath+/views/XXX.jsp或basePath+/views/js/jquery.js）是最稳妥的方案。
 
@@ -342,7 +342,7 @@ User_add.jsp中的表单发出post请求->请求被web服务器接收并封装 -
 
 另外，`./js/jquery.js`等价于`js/jquery.js`，`/js/jquery.js`表示从web服务器根目录开始`http://localhost:8080/js/jquery.js`。要注意区分它们的区别。
 
-## 使用SpringMVC进行数据传递：数据绑定
+## 使用Spring MVC进行数据传递：数据绑定
 从客户端到服务器进行参数传递时，常需要绑定的数据类型有：
 1. 基本数据类型的绑定
 2. 包装数据类型的绑定
@@ -373,7 +373,7 @@ public class DataController {
 ```
 
 ### 包装数据类型的绑定
-springMVC提供了自动的数据类型转换，String -> 基本数据类型：
+Spring MVC提供了自动的数据类型转换，String -> 基本数据类型：
 
 `<input type="text" value="10" name="n">` -> int n = 10;
 
@@ -408,7 +408,7 @@ String is
 ### POJO（实体类）的绑定
 没有逻辑关系的数据，可以通过基本数据类型或者包装数据类型获取。但对于有逻辑关系的数据，就需要将其封装到一个pojo中。
 
-在之前学习Servlet时，开发者每次需要手动获得数据的值，并封装到对象。而SpringMVC提供了相应的解决方案。
+在之前学习Servlet时，开发者每次需要手动获得数据的值，并封装到对象。而Spring MVC提供了相应的解决方案。
 
 首先建立pojo类，例如User类，封装以下属性并添加get/set方法。
 ```java
@@ -427,7 +427,7 @@ private double height;
     <p><input type="submit" value="提交"></p>
 </form>
 ```
-在Controller执行方法的参数中传入该User对象即可直接使用，SpringMVC已经完成了获取值并封装到对象的过程。
+在Controller执行方法的参数中传入该User对象即可直接使用，Spring MVC已经完成了获取值并封装到对象的过程。
 ```java
 @RequestMapping("addUser")
 public ModelAndView add(User user) {
@@ -497,7 +497,7 @@ Student类新增一个属性`private String[] hobby;`与相应的get/set方法�
       return mv;
   }
   ```
-* Date类型的绑定：由于SpringMVC没有提供Date类型的自动绑定，所以需要我们自己定义由String类型到Date类型的转换器：
+* Date类型的绑定：由于Spring MVC没有提供Date类型的自动绑定，所以需要我们自己定义由String类型到Date类型的转换器：
   ```java
   package util;
   import java.text.ParseException;
@@ -687,7 +687,7 @@ and or not eq ne lt gt le ge true false null empty div mod
   - 取值,2
   - 其他，5
 
-结合SpringMVC与EL，在Controller的处理方法中为ModelAndView添加Model信息。
+结合Spring MVC与EL，在Controller的处理方法中为ModelAndView添加Model信息。
 ```java
 @Controller
 @RequestMapping("/student")
@@ -738,7 +738,7 @@ JSTL标准标签库包含了核心标签库、XML库、格式化库、SQL标签�
 ```
 接下来在JSP中就可以使用标签。
 
-### 通用标签：
+### 通用标签
 ```html
 <p>使用基本标签set设置属性，等价于request.setAttribute("",Object)</p>
 <c:set var="s" value="Hello request" scope="request"/>
@@ -783,7 +783,167 @@ JSTL标准标签库包含了核心标签库、XML库、格式化库、SQL标签�
 </c:choose>
 ```
 ### 迭代标签
+为方便起见，在JSP中用Java语句手动构造一个List并放在request容器中（实际应该是用户提交的或从数据库获取的）。
+```java
+<%
+    ArrayList<Student> list =new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+        Student stu =new Student();
+        stu.setName("学生"+i);
+        stu.setAge(i);
+        stu.setSex((i&1)==1?"男":"女");
+        list.add(stu);
+    }
+    request.setAttribute("students",list);
+%>
+```
+以前，我们想要遍历该List只能在jsp中使用Java语句：
+```java
+<%
+  ArrayList<Student> stus=(ArrayList<Student>) request.getAttribute("students");
+    for (Student stu : stus) {
+%>
+        <br><%=stu%>
+<%
+    }
+%>
+```
+现在使用JSTL的foreach标签+EL来遍历：
+#### 简单遍历
+items表示被遍历的对象集合，var是当前被读取的对象的别名，使用EL取出该对象的值。varStatus是当前被读取对象的状态，其中vs.first、last指的是该元素否为按照给定的开始结束步长所取出结果的开头和结尾。
+```html
+<c:forEach items="${students}" var="stu" varStatus="vs" begin="0" end="5" step="2">
+    当前元素下标（从0开始）：${vs.index},
+    当前元素计数（从1开始）：${vs.count},
+    当前元素是否为第一个?：${vs.first},
+    当前元素是否为最后一个?：${vs.last},
+    当前元素toString：${stu}<br>
+</c:forEach>
+```
 
+#### 嵌套遍历
+要遍历集合中的元素还有集合的情况，例如：
+```java
+<%
+    ArrayList<Classes> classes=new ArrayList<>();
+    for (int i = 0; i < 3; i++) {
+        Classes cla=new Classes("18级"+i+"班","计算机系");
+        ArrayList<Student> students=new ArrayList<>();
+        for (int j = 0; j < 10; j++) {
+            Student stu=new Student();
+            stu.setName("学生"+j);
+            stu.setAge(j+10);
+            stu.setCl(cla);
+            students.add(stu);
+        }
+        cla.setList(students);
+        classes.add(cla);
+    }
+    request.setAttribute("Classes",classes);
+%>
+```
+如果在JSP中使用Java代码段就会因为很多的`<%%>`标签显得十分臃肿，这时使用EL+JSTL就可以：
+```html
+<c:forEach items="${Classes}" var="c" varStatus="vs">
+    <h3>${vs.count}.${c.name}</h3>
+    <hr>
+    <c:forEach items="${c.list}" var="l" >
+        <br>${l}
+    </c:forEach>
+</c:forEach>
+```
+#### 遍历数组以及Map
+遍历数组和遍历集合并没有太大区别：
+```java
+<%
+    String[]ss= new String[10];
+    for (int i = 0; i < 10; i++) {
+        ss[i]="这是第"+i+"个字符";
+    }
+    request.setAttribute("ss",ss);
+%>
+```
+```html
+<h2>JSTL取出并显示数组</h2>
+<c:forEach items="${requestScope.ss}" varStatus="vs" var="str">
+    <br>${vs.count}.${str}
+</c:forEach>
+```
+由于Map并不是设计来遍历的，在想要遍历map就可能需要使用到entrySet()、keySet()、values()：
+```java
+<%
+    HashMap<String,String> map = new HashMap<>();
+    for (int i = 0; i < 10; i++) {
+        map.put("key"+i,"value"+i);
+    }
+    request.setAttribute("map",map);
+%>
+<%
+    HashMap<String,String> mymap= (HashMap<String, String>) request.getAttribute("map");
+    for (Map.Entry<String, String> entry : mymap.entrySet()) {
+%>
+    <br>key=<%=entry.getKey()%>,value=<%=entry.getValue()%>
+<%
+    }
+%>
+```
+而使用JSTL则不用考虑显式指明entrySet的问题，直接使用`{$别名.key}`和`{$别名.value}`对map的entry进行遍历：
+```html
+<h2>使用JSTL遍历map</h2>
+<c:forEach items="${map}" var="entry" varStatus="vs">
+    <br>${vs.count}.&nbsp key=${entry.key},value=${entry.value}
+</c:forEach>
+```
+
+#### 混合遍历Map+List
+同样地，对于嵌套的集合或数组：
+```java
+<%
+    HashMap<String,Classes> classes=new HashMap();
+    for (int i = 0; i < 3; i++) {
+        Classes cla=new Classes("18级"+i+"班","计算机系");
+        ArrayList<Student> students=new ArrayList<>();
+        for (int j = 0; j < 10; j++) {
+            Student stu=new Student();
+            stu.setName("学生"+j);
+            stu.setAge(j+10);
+            stu.setCl(cla);
+            students.add(stu);
+        }
+        cla.setList(students);
+        classes.put(cla.getName(),cla);
+    }
+    request.setAttribute("Classes",classes);
+%>
+```
+也可以使用嵌套遍历：
+```html
+<h2>使用JSTL双重迭代取出数据</h2>
+<c:forEach items="${Classes}" var="c" varStatus="vs">
+    <h3>${vs.count}.&nbsp${c.key}----${c.value.dept}</h3>
+    <hr>
+    <c:forEach items="${c.value.list}" var="li" >
+        <br>${li}
+    </c:forEach>
+</c:forEach>
+```
+
+## 总结
+EL表达式没有任何的逻辑关系，本质上是表达式，用于从容器和上下文中取值并做简单的运算（算术、逻辑、关系、混合）。
+
+JSTL标签（核心库）具有逻辑关系，主要用于：
+* 通用操作：控制容器中数据的读写删除（set out remove）
+* 流程控制：if+choose（when+otherwise）
+* 迭代：对集合进行遍历操作（Array、List、Map）
+
+结合使用两者就基本上告别了JSP标签，将html与java剥离开，简化了代码。
+
+Spring MVC总体流程：
+```
+1->2：跳转控制：客户端的带有参数的请求发送到服务器，交给对应的Controller/Method处理。
+1->2：数据绑定：Method通过数据绑定很方便地取出数据，处理后通过mv.addObject()封装进ModelAndView中（request）再转发给JSP。
+2->3：EL+JSTL：在JSP中使用这两项技术便捷地取出容器中的数据，将最终的html通过response返回给客户端。
+```
 
 ***
 ***未完待续***
