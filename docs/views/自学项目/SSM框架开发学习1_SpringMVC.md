@@ -928,7 +928,160 @@ items表示被遍历的对象集合，var是当前被读取的对象的别名，
 </c:forEach>
 ```
 
-## 总结
+## 小项目模拟实战：社区疫情防控登记
+使用前面学到的Spring MVC的相关知识，结合JDBC实现一个社区疫情防控登记系统。
+### 1. 数据/实体层设计
+理论上要分析需求并画ER图来辅助建表，这里由于背景问题比较简单所以就直接建表了。
+|编号|字段|类型|约束|备注|
+|:--|:--|:--|:--|:--|
+|1.|id|int|primary key auto_increment|id|
+|2.|person|varchar(20)|not null|姓名|
+|3.|community|varchar(50)||社区|
+|4.|tel|varchar(50)||电话|
+|5.|carNum|varchar(20)||车牌号|
+|6.|isOutCity|bool|default false|是否离开本市|
+|7.|isFromHB|bool|default false|是否来自湖北|
+|8.|isHouseHold|bool|default true|是否为业主|
+|9.|nowTime|datetime||当前时间|
+对应的SQL语句为：
+```sql
+CREATE TABLE `record`  (
+  `id` int(0) NOT NULL AUTO_INCREMENT,
+  `person` varchar(20) NOT NULL,
+  `community` varchar(50),
+  `tel` varchar(50),
+  `carNum` varchar(20),
+  `isOutCity` tinyint(1)  DEFAULT 0,
+  `isFromHB` tinyint(1)  DEFAULT 0,
+  `isHouseHold` tinyint(1)  DEFAULT 1,
+  `nowTime` datetime(0)  DEFAULT NULL,
+  PRIMARY KEY (`id`)
+)
+```
+### 2. 模型层实现：POJO & DAO
+创建一个新的Maven webapp项目，在pom.xml中添加依赖配置，创建源文件和资源文件目录，在资源文件目录下创建spring-servlet.xml并配置需要扫描的包与视图解析器，最后在web.xml中注册encodingFilter和DispatcherServlet并加载spring-servlet.xml这一配置文件，最后编辑tomcat启动配置。
+
+在pojo包下新建对应的Record类，添加对应的属性与get/set方法。
+
+创建RecordDAO接口，声明与增删改查相关的方法。为了在DAO中使用JDBC，在pom.xml中添加mysql的驱动：
+```xml
+<dependency>
+  <groupId>mysql</groupId>
+  <artifactId>mysql-connector-java</artifactId>
+  <version>8.0.20</version>
+</dependency>
+```
+为便于管理，把建立数据库连接和关闭连接的操作放在DBManager类中。接下来就可以编写其实现类MySqlRecordDAO，DAO内的各方法关注于java类型与数据库类型的转换、生成相应的SQL语句、执行语句并返回结果。例如时间的转换：`ps.setDate(8,new java.sql.Date(r.getNowTime().getTime()));`
+
+### 3. 控制层实现：Controller - method
+在controller包下添加RecordController类并添加Controller注解，编写相关的method并添加RequestMapping。
+```java
+@Controller
+@RequestMapping("/record")
+public class RecordController {
+    @RequestMapping("/add")
+    public ModelAndView add(Record record){
+        ModelAndView mv =new ModelAndView();
+        record.setNowTime(new Date());
+        RecordDAO recordDAO=new MySQLRecordDAO();
+        int n=recordDAO.insertRecord(record);
+        if (n > 0) {
+            mv.addObject("rec", record);
+            mv.setViewName("Record_show");
+        } else {
+            mv.addObject("msg","添加用户失败");
+            mv.setViewName("message");
+        }
+        return mv;
+    }
+
+    @RequestMapping("/listAll")
+    public ModelAndView listAll() {
+        ModelAndView mv = new ModelAndView();
+        RecordDAO recordDAO=new MySQLRecordDAO();
+        List<Record> list=recordDAO.getAllRecords();
+        mv.addObject("records",list);
+        mv.setViewName("Record_list");
+        return mv;
+    }
+
+    @RequestMapping("/show")
+    public ModelAndView show(int id) {
+        ModelAndView mv =new ModelAndView();
+        RecordDAO recordDAO = new MySQLRecordDAO();
+        Record r= recordDAO.getRecById(id);
+        mv.addObject("rec",r);
+        mv.setViewName("Record_show");
+        return mv;
+    }
+
+    @RequestMapping("/delete")
+    public ModelAndView deleteRec(int id) {
+        ModelAndView mv = new ModelAndView();
+        RecordDAO recordDAO= new MySQLRecordDAO();
+        int n=recordDAO.deleteRecById(id);
+        if (n > 0) {
+            mv.addObject("msg", "删除id为" + id + "的记录成功");
+        } else {
+            mv.addObject("msg","删除id为" + id + "的记录失败");
+        }
+        mv.setViewName("message");
+        return mv;
+    }
+}
+```
+
+### 4. 显示层实现：提交请求与反馈结果
+创建index.jsp作为各项功能的入口。
+
+创建Record_add.jsp和Record_show.jsp，分别用于单次提交信息和显示信息。
+
+在Record_add.jsp提交信息的表单中，保证每个`<input>`的`name`属性与pojo的set方法名吻合（首字母大小写似乎不影响）。例如pojo中的属性carNum和isOutCity对应的set方法名为setCarNum和setOutCity（`is`开头的boolean自动生成get/set方法会为isOutCity和setOutCity，要特别注意）
+```html
+<input type="text" class="input" name="carNum" value="" />
+<input type="radio"  name="OutCity" checked="checked" value="true" />离开过
+<input type="radio"  name="OutCity" value="false" />没有离开
+```
+
+在Record_show.jsp中，使用EL表达式取出由Controller转发过来的Record对象的值，例如：
+```html
+<tr>
+    <td>车牌号</td>
+    <td>${rec.carNum}</td>
+</tr>
+
+<tr>
+    <td>是否离开过本市</td>
+    <td>${rec.outCity}</td>
+</tr>
+```
+
+在Record_list.jsp中显示已登记的人员信息列表。使用JSTL+EL迭代取出列表中的人员信息。
+```html
+<c:forEach items="${records}" var="r" varStatus="vs">
+    <tr>
+        <td>${vs.count}</td>
+        <td>${r.person}</td>
+        <td>${r.carNum}</td>
+        <td>${r.nowTime}</td>
+        <td></td>
+
+        <td>
+            <div class="button-group">
+            <a class="button border-red" href="<%=basePath%>record/show?id=${r.id}" >显示详情</a>
+            <a class="button border-red" href="<%=basePath%>record/update?id=${r.id}" >修改</a>
+            <a class="button border-red" href="<%=basePath%>record/delete?id=${r.id}" onclick="return del(1)"><span class="icon-trash-o"></span> 删除</a>
+            </div>
+        </td>
+    </tr>
+</c:forEach>
+```
+其中，显示详情和删除对应的Controller/method是单条记录的查询和删除。其处理后结果分别指向Record_show.jsp和message.jsp。
+
+修改某条记录要稍微复杂些，在Record_list中点击修改，发送请求至RecordController/update1并传递id参数，该method查询数据库并跳转到Record_update.jsp以在表单中显示该记录的完整信息；在客户端修改完对应的属性后发送请求至RecordController/update2，该method执行update语句后返回结果到Record_show.jsp。
+
+***
+## 知识总结
 EL表达式没有任何的逻辑关系，本质上是表达式，用于从容器和上下文中取值并做简单的运算（算术、逻辑、关系、混合）。
 
 JSTL标签（核心库）具有逻辑关系，主要用于：
@@ -944,6 +1097,3 @@ Spring MVC总体流程：
 1->2：数据绑定：Method通过数据绑定很方便地取出数据，处理后通过mv.addObject()封装进ModelAndView中（request）再转发给JSP。
 2->3：EL+JSTL：在JSP中使用这两项技术便捷地取出容器中的数据，将最终的html通过response返回给客户端。
 ```
-
-***
-***未完待续***
