@@ -557,7 +557,7 @@ public Object queryValue(String sql, Object[] params) {
 }
 ```
 :::warning
-老师说这里的钩子方法又称为回调，但我查了更多关于回调的知识，感觉这里仅仅是模版方法中对具体实现类的一次普通调用。更多关于Java回调的知识可移步至[Java回调机制](../知海拾贝/Java回调机制.md)。
+老师说这里的钩子方法又称为回调，但我查了更多关于回调的知识，感觉这里仅仅是模版方法中对具体实现类的一次普通调用。更多关于Java回调的知识可移步至[Java回调机制](../知海拾贝/Java/Java回调机制.md)。
 :::
 
 ## Query类设计模式优化：工厂模式/单例模式/克隆模式
@@ -683,10 +683,10 @@ public synchronized void close(Connection conn) {
 框架最终大致分为三个部分：
 1. DBConnPool和Configuration作为类变量由DBManager在类加载时维护，供其他类获得数据库连接和配置信息。
 2. TableContext维护两个Map类变量，在类加载时将数据库中所有的表信息ColumnInfo（TableInfo）与表名和类名关联起来，并调用JavaFileUtils创建Po包中的Java源文件（该过程使用了TypeConverter、JavaFieldGetSet、StringUtil）。
-3. 用户通过QueryFactory得到Query来执行SQL语句，Query用到JDBCUtils为Statement设参数。在执行DQL语句时由Po包中的源文件创建对应的对象，并使用ReflectUtils调用该对象的set方法将查询到的值存入对象中并返回；在执行DML语句时（如有必要根据传入的对象使用ReflectUtils调用该对象的get方法）获取类对象和主键来构造SQL语句并执行。
+3. 用户通过QueryFactory得到Query来执行增删改查操作，Query用到JDBCUtils为Statement设参数。在执行DQL语句时由Po包中的源文件创建对应的对象，并使用ReflectUtils调用该对象的set方法将查询到的值存入对象中并返回；在执行DML语句时（如有必要根据传入的对象使用ReflectUtils调用该对象的get方法）获取类对象和主键来构造SQL语句并执行。
 
 ## 导出jar包并生成API文档
-在IDEA中，打开`Project Structure`，在`Artifacts`中添加`jar/from modules with dependencies`，选择导出的路径，留空`Main Class`并选择`copy to the output directory and link via manifest`。接下来在Output Layout中删去mysql-connector以避免将MySQL驱动包一起加入到导出的jar包中，Type选择Other即可（选择JAR会讲所有output都打入一个jar包）。最后点击菜单中的Build Artifacts即可。
+在IDEA中，打开`Project Structure`，在`Artifacts`中添加`jar/from modules with dependencies`，选择导出的路径，留空`Main Class`并选择`copy to the output directory and link via manifest`。接下来在Output Layout中删去mysql-connector以避免将MySQL驱动包一起加入到导出的jar包中，Type选择Other即可（选择JAR会将所有output都打入一个jar包）。最后点击菜单中的Build Artifacts即可。
 
 ![JAR-3.png](https://wx1.sbimg.cn/2020/06/13/JAR-3.png)
 
