@@ -118,7 +118,7 @@ categories:
 </mappers>
 ```
 
-接下来就可以在该UserMapper.xml中写SQL了（而不用在Java源文件中写SQL），其中理论上namespace可以写成任意不重复的名称，但后面整合时通常写为POJO的包名+类名。
+接下来就可以在该UserMapper.xml中写SQL了（而不用在Java源文件中写SQL），其中理论上namespace可以写成任意不重复的名称，但后面整合时通常写为POJO的全限定名。
 ```xml
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper
@@ -141,7 +141,7 @@ import org.junit.Test;
 
 public class UserTest {
     @Test
-    public void test1() {
+    public void testSelect() {
         //查询user表的所有内容
         try {
             //1.连接数据库
@@ -162,4 +162,195 @@ public class UserTest {
         }
     }
 }
+```
+
+## 用MyBatis进行简单查询
+一般在一个Mapper.xml中的同一个`<mapper>`下可以针对某一pojo编写其CRUD语句。
+
+### CREATE/INSERT 增
+在mapper标签下定义如下：
+```xml
+<mapper namespace="user">
+    <!-- parameterType为输入对象类型，在DML语句中用#{}来取出对象的值 -->
+    <insert id="insertUser" parameterType="pojo.User">
+        insert into user(name, pwd) VALUES (#{name},#{pwd})
+    </insert>
+</mapper>
+```
+接下来可以用session.insert("namespace.id",User)来插入对象，一次事物内可以有多条插入语句，记得commit。
+```java
+@Test
+public void testInsert() {
+    try {
+        InputStream inputStream=Resources.getResourceAsStream("MyBatisConfig.xml");
+        SqlSessionFactory ssf=new SqlSessionFactoryBuilder().build(inputStream);
+        SqlSession session=ssf.openSession();
+
+        int count=0;
+        for (int i = 0; i < 10; i++) {
+            User user=new User("user_"+i,"123");
+            count+=session.insert("user.insertUser",user);
+        }
+
+        //只要不是DQL语句，执行完都要commit
+        session.commit();
+        session.close();
+        System.out.println("成功插入"+count+"条记录");
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+}
+```
+
+### DELETE 删
+在mapper中配置：
+```xml
+    <!-- 删除 如果有where子句则需要配置parameterType-->
+    <delete id="deleteUserById" parameterType="int">
+        delete from user where id=#{id}
+    </delete>
+```
+我们发现在单元测试中不论是增删改查都需要先创建SqlSessionFactory和Session，执行完SQL语句后要关闭Session，所以封装这些操作并使用注解@Before 和 @After来减少代码冗余。
+```java
+    SqlSessionFactory ssf;
+    SqlSession session;
+
+    @Before
+    public void init() {
+        //连接数据库--加载mybatis核心配置文件并获得session
+        try {
+            InputStream inputStream=Resources.getResourceAsStream("MyBatisConfig.xml");
+            ssf=new SqlSessionFactoryBuilder().build(inputStream);
+            session=ssf.openSession();
+        } catch (Exception exception) {
+            exception.printStackTrace();
+        }
+    }
+
+    @After
+    public void close() {
+        //关闭连接
+        session.close();
+        session=null;
+    }
+```
+现在编写删除的测试：
+```java
+    @Test
+    public void deleteUser() {
+        int n=session.delete("user.deleteUserById",10);
+        session.commit();
+        System.out.println("删除了"+n+"条记录");
+    }
+```
+
+### UPDATE 改
+mapper，目前暂时只使用parameterType传入1个参数，不考虑多参数的。
+```xml
+    <update id="updateUser" parameterType="String">
+        update user set pwd=#{pwd}
+    </update>
+```
+测试：
+```java
+    @Test
+    public void update() {
+        int n=session.update("user.updateUser","88888");
+        session.commit();
+        System.out.println("更新了"+n+"条记录");
+    }
+```
+
+### RETRIEVE/SELECT 查
+mapper:
+```xml
+    <select id="getUserById" parameterType="int" resultType="pojo.User">
+        select * from user where id=#{id}
+    </select>
+```
+测试：
+```java
+    @Test
+    public void selectOneTest() {
+        User user=session.selectOne("user.getUserById",2);
+        System.out.println(user);
+    }
+```
+## 用MyBatis进行复杂查询
+### 模糊查询
+```xml
+    <select id="getUserLikeName1" parameterType="String" resultType="pojo.User">
+        select * from user where name like #{s}
+    </select>
+```
+```java
+    @Test
+    public void vagueSelect() {
+        List<User> users=session.selectList("user.getUserLikeName1","user%");
+        for (User user : users) {
+            System.out.println(user);
+        }
+    }
+```
+前面的传值都是使用`#{}`来传值，它会为取到的值自动加上`''`，还可以使用`${}`来取值，不过就不会自动加上单引号，并且`${}`中的属性名要与参数类中的属性名一致。
+
+我们能用`#{}`就不用`${}`。除了动态SQL语句中如果是要取表名则必须用`${}`。
+
+此外在mapper中还可以使用concat
+```xml
+    <select id="getUserLikeName1" parameterType="String" resultType="pojo.User">
+        select * from user where name like concat(#{s},'%')
+    </select>
+```
+
+### 封装多条件查询
+当需要传入多个查询条件时，由于parameterType只能传入1个参数，所以可以把条件封装到一个类中。
+:::warning
+注意，在xml内写sql语句不能直接使用`<`和`>`，因为会被解析为标签。语句中涉及该问题时要使用转义字符。
+|原符号|转义字符|
+|--|--|
+|<|`&lt;`|
+|<=|`&lt;=`|
+|>|`&gt;`|
+|>=|`&gt;=`|
+|&|`&amp;`|
+|'|`&apos;`|
+|"|`&quot;`|
+:::
+```xml
+    <select id="getUserByNameId" parameterType="pojo.User" resultType="pojo.User">
+        select * from user where name like concat(#{name},'%') and id&lt;#{id}
+    </select>
+```
+测试：
+```java
+    @Test
+    public void test6() {
+        User user=new User(10,"user",null);
+        List<User> users=session.selectList("user.getUserByNameId",user);
+        for (User u : users) {
+            System.out.println(u);
+        }
+    }
+```
+
+### Map查询
+很多情况下多个查询条件不能封装到一个pojo中，例如要执行多表查询。为此，可使用map查询。将查询的条件放到map中，在SQL语句中就可以使用key来获得值。
+```xml
+    <select id="getUserByMap" parameterType="java.util.Map" resultType="pojo.User">
+        select * from user where id&lt;=#{id} and name like #{name}
+    </select>
+```
+测试：
+```java
+    @Test
+    public void test9() {
+        Map<String,Object> map =new HashMap<String,Object>();
+        map.put("name","user%");
+        map.put("id",10);
+        List<User> users=session.selectList("user.getUserByMap",map);
+        for (User u : users) {
+            System.out.println(u);
+        }
+    }
 ```
