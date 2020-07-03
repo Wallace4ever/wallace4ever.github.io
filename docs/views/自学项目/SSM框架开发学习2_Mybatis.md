@@ -292,7 +292,7 @@ mapper:
         }
     }
 ```
-前面的传值都是使用`#{}`来传值，它会为取到的值自动加上`''`，还可以使用`${}`来取值，不过就不会自动加上单引号，并且`${}`中的属性名要与参数类中的属性名一致。
+前面的传值都是使用`#{}`来传值，它是占位符赋值，如果是字符串类型会自动加上`''`，还可以使用`${}`来取值，不过就不会自动加上单引号，并且`${}`中的属性名要与参数类中的属性名一致。
 
 我们能用`#{}`就不用`${}`。除了动态SQL语句中如果是要取表名则必须用`${}`。
 
@@ -354,3 +354,61 @@ mapper:
         }
     }
 ```
+
+## Mybatis的关联映射
+关联关系是面向对象分析、面向对象设计最终的思想，MyBatis的关联映射可以大大简化持久层的数据访问。关联关系大致可分为：
+1. 一对一：例如居民与身份证，任意一方持有对方的id
+2. 一对多：例如班级与学生，多的一方持有另一方的id
+3. 多对多：例如商品与订单，使用中间表/关系表持有双方的id
+
+### 案例：社区疫情登记
+**数据准备：**
+
+现在我们需要登记住户在疫情期间的入住和流动信息。那么设计ER图时有两个实体：住户和小区，同时这两个实体间存在两种关系：住户住在某一小区（多对一）和住户在多个小区间流动（多对多）。这样就存在两张实体表和一张关系表。
+
+实体表：社区
+```sql
+create table community(
+    c_id int primary key auto_increment,
+    c_name varchar(50) not null,
+    c_province varchar(20),
+    c_city varchar(20),
+    c_street varchar(20),
+    c_tel varchar(30)
+);
+```
+实体表：住户
+```sql
+create table resident(
+    r_id int primary key auto_increment,
+    r_name varchar(30) not null,
+    r_tel varchar(40) not null,
+    r_sex varchar(10),
+    r_age int,
+    r_house_number varchar(50),
+    r_work_unit varchar(50),
+    r_car_num varchar(20),
+    r_household bool default true,
+    r_c_id int
+);
+```
+关系表：
+```sql
+create table record(
+    rec_id int primary key auto_increment,
+    rec_r_id int,
+    rec_c_id int,
+    rec_out_city bool default false,
+    rec_from_hb bool default false,
+    rec_household bool default true,
+    rec_now_time datetime
+);
+```
+构造10个社区对象与50个住户对象并插入表中，后面测试插入时如果需要重置自增的id可以：
+```sql
+ALTER TABLE table DROP id;
+ALTER TABLE table ADD id INT NOT NULL PRIMARY KEY AUTO_INCREMENT FIRST
+```
+
+***
+**未完待续**
