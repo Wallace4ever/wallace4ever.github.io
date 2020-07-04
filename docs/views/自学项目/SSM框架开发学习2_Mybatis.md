@@ -276,7 +276,7 @@ mapper:
         System.out.println(user);
     }
 ```
-## 用MyBatis进行复杂查询
+## 用MyBatis进行复杂条件查询
 ### 模糊查询
 ```xml
     <select id="getUserLikeName1" parameterType="String" resultType="pojo.User">
@@ -334,7 +334,7 @@ mapper:
     }
 ```
 
-### Map查询
+### Map条件查询
 很多情况下多个查询条件不能封装到一个pojo中，例如要执行多表查询。为此，可使用map查询。将查询的条件放到map中，在SQL语句中就可以使用key来获得值。
 ```xml
     <select id="getUserByMap" parameterType="java.util.Map" resultType="pojo.User">
@@ -362,7 +362,7 @@ mapper:
 3. 多对多：例如商品与订单，使用中间表/关系表持有双方的id
 
 ### 案例：社区疫情登记
-**数据准备：**
+#### 数据准备
 
 现在我们需要登记住户在疫情期间的入住和流动信息。那么设计ER图时有两个实体：住户和小区，同时这两个实体间存在两种关系：住户住在某一小区（多对一）和住户在多个小区间流动（多对多）。这样就存在两张实体表和一张关系表。
 
@@ -409,6 +409,68 @@ create table record(
 ALTER TABLE table DROP id;
 ALTER TABLE table ADD id INT NOT NULL PRIMARY KEY AUTO_INCREMENT FIRST
 ```
+
+#### 多对一关系
+在数据库中一对多和多对一体现形式是一样的（主键与外键），只是我们在POJO中的体现有所不同。
+
+如果要执行如下所示的多表查询：
+```xml
+<select id="getAllResident2" resultType="pojo.Resident">
+    select r.r_id,r.r_name,c.c_name,c.c_id
+    from resident r,community c
+    where r.r_c_id=c.c_id
+</select>
+```
+那么就需要改动返回类型Resident类为其增加c_name属性，这显然是和面向对象原则冲突。正确的方法应该是在Resident类中添加一个对Community对象的引用，并在mapper中先自定义返回的结果集resultMap。
+```xml
+<!--
+(I)resultMap的属性:id是唯-标识, type是关联的pojo类
+(2)子标签<id>,column=关联表的主键名, property=pojo的对应属性
+(3)子标签<result> ,对表的字段和pojo的属性进行匹配。column=关联表的字段名 , property=pojo的对应属性
+(4)于标签<association >,配置关联POJO对象, property=对象名 javaType=关联pojo的类型
+只读取配置了的字段,没有配置的字段不会去读取
+-->
+
+<resultMap id="residentInfo" type="pojo.Resident">
+    <id column="r_id" property="r_id"/>
+    <result column="r_name" property="r_name"/>
+    <association property="community" javaType="pojo.Community">
+        <id column="c_id" property="c_id"/>
+        <result column="c_name" property="c_name"/>
+    </association>
+</resultMap>
+```
+接下来编写的select标签就不使用resultType而是resultMap了：
+```xml
+<select id="getAllResident2" resultMap="residentInfo">
+    select r.r_id,r.r_name,c.c_name,c.c_id
+    from resident r,community c
+    where r.r_c_id=c.c_id
+</select>
+```
+总结：多对一关系在数据库、POJO、MyBatis中的体现
+1. 数据库：n一方的外键对应1那一方的主键
+2. POJO：n一方包含一个1那一方的属性
+3. MyBatis：自定义resultMap返回n一方并通过association关联1那一方。
+
+#### 一对多关系
+在pojo的`1`类中添加`n`类的容器比如Community类中增加属性`List<Resident>`。对于容器我们需要在resultMap中添加`<collection>`标签
+```xml
+<resultMap id="commInfo" type="pojo.Community">
+    <id column="c_id" property="c_id"/>
+    <result column="c_name" property="c_name"/>
+    <result column="c_province" property="c_province"/>
+    <result column="c_city" property="c_city"/>
+    <result column="c_street" property="c_street"/>
+    <result column="c_tel" property="c_tel"/>
+    <collection property="residentList" ofType="pojo.Resident">
+        <id column="r_id" property="r_id"/>
+        <result column="r_name" property="r_name"/>
+        <result column="r_house_number" property="r_house_number"/>
+    </collection>
+</resultMap>
+```
+
 
 ***
 **未完待续**
