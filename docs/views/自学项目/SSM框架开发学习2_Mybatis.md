@@ -276,7 +276,7 @@ mapper:
         System.out.println(user);
     }
 ```
-## 用MyBatis进行复杂条件查询
+## MyBatis查询条件的传入
 ### 模糊查询
 ```xml
     <select id="getUserLikeName1" parameterType="String" resultType="pojo.User">
@@ -292,7 +292,7 @@ mapper:
         }
     }
 ```
-前面的传值都是使用`#{}`来传值，它是占位符赋值，如果是字符串类型会自动加上`''`，还可以使用`${}`来取值，不过就不会自动加上单引号，并且`${}`中的属性名要与参数类中的属性名一致。
+前面的传值都是使用`#{}`来传值，它是占位符赋值，如果是字符串类型会自动加上`''`（准确来说是`?`会进行预编译），还可以使用`${}`来取值，不过就不会预编译、自动加上单引号，并且`${}`中的属性名要与参数类中的属性名一致。
 
 我们能用`#{}`就不用`${}`。除了动态SQL语句中如果是要取表名则必须用`${}`。
 
@@ -355,14 +355,14 @@ mapper:
     }
 ```
 
-## Mybatis的关联映射
+## Mybatis查询结果到POJO的关联映射
 关联关系是面向对象分析、面向对象设计最终的思想，MyBatis的关联映射可以大大简化持久层的数据访问。关联关系大致可分为：
 1. 一对一：例如居民与身份证，任意一方持有对方的id
 2. 一对多：例如班级与学生，多的一方持有另一方的id
 3. 多对多：例如商品与订单，使用中间表/关系表持有双方的id
 
-### 案例：社区疫情登记
-#### 数据准备
+
+### 数据准备
 
 现在我们需要登记住户在疫情期间的入住和流动信息。那么设计ER图时有两个实体：住户和小区，同时这两个实体间存在两种关系：住户住在某一小区（多对一）和住户在多个小区间流动（多对多）。这样就存在两张实体表和一张关系表。
 
@@ -392,7 +392,7 @@ create table resident(
     r_c_id int
 );
 ```
-关系表：
+关系表：通行记录
 ```sql
 create table record(
     rec_id int primary key auto_increment,
@@ -410,7 +410,7 @@ ALTER TABLE table DROP id;
 ALTER TABLE table ADD id INT NOT NULL PRIMARY KEY AUTO_INCREMENT FIRST
 ```
 
-#### 多对一关系
+### 多对一关系
 在数据库中一对多和多对一体现形式是一样的（主键与外键），只是我们在POJO中的体现有所不同。
 
 如果要执行如下所示的多表查询：
@@ -453,7 +453,7 @@ ALTER TABLE table ADD id INT NOT NULL PRIMARY KEY AUTO_INCREMENT FIRST
 2. POJO：n一方包含一个1那一方的属性
 3. MyBatis：自定义resultMap返回n一方并通过association关联1那一方。
 
-#### 一对多关系
+### 一对多关系
 在pojo的`1`类中添加`n`类的容器比如Community类中增加属性`List<Resident>`。对于容器我们需要在resultMap中添加`<collection>`标签
 ```xml
 <resultMap id="commInfo" type="pojo.Community">
@@ -469,6 +469,43 @@ ALTER TABLE table ADD id INT NOT NULL PRIMARY KEY AUTO_INCREMENT FIRST
         <result column="r_house_number" property="r_house_number"/>
     </collection>
 </resultMap>
+```
+
+### 多对多关系
+考虑人员在小区间的流动通行需要登记，那么这就是一个多对多的关系。
+
+**例子：查询某个通行者一共到过哪几个社区**，那么对应的Mapper为
+```xml
+<select id="whereYouGo"  parameterType="int" resultMap="map1">
+    select r.r_name,c.c_name,rec.rec_now_time
+    from resident r,community c,record rec
+    where r.r_id=#{param} and r.r_id=rec.rec_r_id and c.c_id=rec.rec_c_id
+    order by c.c_name
+</select>
+```
+老师是在通行者pojo中添加`List<Record>`再为Record pojo添加Community属性，我觉得这样没什么问题，但是查询的通行记录应该封装在Record中，所以应该是在Record pojo中添加Resident和Community两个属性，一条Record就记录了是谁在何时通过哪个小区。这时自定义resultMap为：
+```xml
+<resultMap id="map1" type="pojo.Record">
+    <!-- 很奇怪明明上面没有select rec_id 但是这里不写的话结果集会丢失大部分结果 -->
+    <id column="rec_id" property="rec_id"/>
+    <result column="rec_now_time" property="rec_now_time"/>
+    <association property="community" javaType="pojo.Community">
+        <id column="c_id" property="c_id"/>
+        <result column="c_name" property="c_name"/>
+    </association>
+    <association property="resident" javaType="pojo.Resident">
+        <id column="r_id" property="r_id"/>
+        <result column="r_name" property="r_name"/>
+    </association>
+</resultMap>
+```
+测试：
+```java
+@Test
+public void selectTest() {
+    List<Record>list=session.selectList("record.whereYouGo",40);
+    list.forEach(System.out::println);
+}
 ```
 
 
