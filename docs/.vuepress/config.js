@@ -94,13 +94,14 @@ module.exports = {
     "search": true,
     "searchMaxSuggestions": 10,
     "sidebar": "auto",
-    "lastUpdated": "Last Updated",
+    "lastUpdated": "上次更新",
+    "smoothScroll": true,
     "author": "Wallace Xu",
     "authorAvatar": "/avatar.png",
     "startYear": "2019"
   },
   "markdown": {
-    "lineNumbers": true
+    "lineNumbers": false
   },
   "plugins": [
   [
@@ -122,5 +123,13 @@ module.exports = {
       sidebarDepth: 2
     }
   ],
+  [
+    '@vuepress/last-updated',
+    {
+      dateOptions:{
+        hour12: true
+      }
+    }
+  ]
 ]
 }

@@ -277,7 +277,7 @@ mapper:
     }
 ```
 ## MyBatis查询条件的传入
-### 模糊查询
+### 使用String传入单个查询条件
 ```xml
     <select id="getUserLikeName1" parameterType="String" resultType="pojo.User">
         select * from user where name like #{s}
@@ -303,7 +303,7 @@ mapper:
     </select>
 ```
 
-### 封装多条件查询
+### 使用POJO封装多查询条件
 当需要传入多个查询条件时，由于parameterType只能传入1个参数，所以可以把条件封装到一个类中。
 :::warning
 注意，在xml内写sql语句不能直接使用`<`和`>`，因为会被解析为标签。语句中涉及该问题时要使用转义字符。
@@ -334,7 +334,7 @@ mapper:
     }
 ```
 
-### Map条件查询
+### 使用Map封装多查询条件
 很多情况下多个查询条件不能封装到一个pojo中，例如要执行多表查询。为此，可使用map查询。将查询的条件放到map中，在SQL语句中就可以使用key来获得值。
 ```xml
     <select id="getUserByMap" parameterType="java.util.Map" resultType="pojo.User">
@@ -355,7 +355,7 @@ mapper:
     }
 ```
 
-## Mybatis查询结果到POJO的关联映射
+## Mybatis查询到POJO的关联映射
 关联关系是面向对象分析、面向对象设计最终的思想，MyBatis的关联映射可以大大简化持久层的数据访问。关联关系大致可分为：
 1. 一对一：例如居民与身份证，任意一方持有对方的id
 2. 一对多：例如班级与学生，多的一方持有另一方的id
@@ -508,6 +508,40 @@ public void selectTest() {
 }
 ```
 
+## MyBatis接口代理（整合Spring MVC小试牛刀）
+我们希望**每个实体都有对应的DAO接口**，并且能够直接使用DAO接口提供的方法。
+![CMkle.png](https://wx2.sbimg.cn/2020/07/06/CMkle.png)
+MyBatis为我们提供了解决方案：接口代理。开发者只编写实体对应的mapper接口（对应以前JSP+Servlet+Javabean开发中的Dao接口）即可，不必编写具体的Dao实现类。要想使用接口代理,必须要满足的规范约定。
 
+首先仍然是要创建好项目：
+* 于Maven创建webapp项目，并在pom.xml中导入mybatis、mysql、log4j、junit、servlet、jstl、spring相关的依赖以及添加资源搜索目录。
+* 在资源目录下添加 db.properties、log4j.properties、MyBatisConfig.xml、spring-servlet.xml，在MyBatisConfig.xml中引入db.properties作为数据源配置，在web.xml中注册DispatcherServlet并使用spring-servlet.xml作为配置文件，spring-servlet.xml中依然是配置扫描包、注解与视图解析器。
+* 与以前的开发有所不同，这次在java源文件目录下我们除了创建controller、pojo、util三个包外，还创建mapper包（和DAO对应）。mapper包中存放的就是我们定义的Mapper接口。
+
+### MyBatis接口代理步骤
+0. 定义数据库
+1. 定义pojo
+2. 定义Mapper接口:对数据库的操作，我们只定义接口
+    * Mapper接口方法名和PojoMapper.xml中定义的每个sql的id同名。
+    * Mapper接口方法的输入参数类型和PojoMapper.xml中定义的sql的parameterType类型相同。
+    * Mapper接口的返回类型和PojoMapper.xml中定义的sgl的resultType类型相同
+3. 定义映射文件
+    * 在mapper.xml中namespace的值等于Mapper接口的全限定名
+    * Mapper接口中的方法名和mapper.xmI中statement的id必须一致
+    * Mapper接口中的方法输入参数类型和mapper.xmI中statement的parameterType指定的类型一致
+    * Mapper接口中的方法返回值类型和mapper.xml中statement的resultType指定的类型一 致
+4. 注册mapper到MyBatis核心配置文件中
+    * 可使用单个注册或包注册
+
+那么MyBatis接口代理的“代理”体现在哪里呢？
+
+一般对于每一张表会有一个pojo，以前我们会为每个pojo写一个POJODAO的实现类，现在则只需要给出对应的POJO Mapper接口。例如针对Record类创建RecordMapper接口，并在接口中声明`public int insertOneRecord(Record r);`、`public int deleteOneRecord(Record r);`、`public List<Record> getAllRecords(String param1, int param2,...);`等方法。以往我们需要自己提供DAO接口的实现类，完成下面的操作：
+1. 建立连接
+2. 得到Statement对象
+3. **给出sq|语句**
+4. 执行sq|语句并处理结果(基本类型、引用类型、结果集)
+5. 断开连接
+
+而现在我们在声明Mapper接口后，只需要对应其中每一个方法给出sql语句即可（当然Mapper接口和mapper映射文件的定义必须严格遵守上面的要求），其余的步骤都由MyBatis替我们完成。这其实就吻合了`代理模式`这一设计模式。
 ***
 **未完待续**
