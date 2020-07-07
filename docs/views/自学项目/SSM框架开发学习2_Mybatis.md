@@ -518,10 +518,11 @@ MyBatis为我们提供了解决方案：接口代理。开发者只编写实体�
 * 在资源目录下添加 db.properties、log4j.properties、MyBatisConfig.xml、spring-servlet.xml，在MyBatisConfig.xml中引入db.properties作为数据源配置，在web.xml中注册DispatcherServlet并使用spring-servlet.xml作为配置文件，spring-servlet.xml中依然是配置扫描包、注解与视图解析器。
 * 与以前的开发有所不同，这次在java源文件目录下我们除了创建controller、pojo、util三个包外，还创建mapper包（和DAO对应）。mapper包中存放的就是我们定义的Mapper接口。
 
-### MyBatis接口代理步骤
+### 模型层使用MyBatis接口代理🚩
+#### MyBatis接口代理配置步骤
 0. 定义数据库
 1. 定义pojo
-2. 定义Mapper接口:对数据库的操作，我们只定义接口
+2. 定义Mapper接口
     * Mapper接口方法名和PojoMapper.xml中定义的每个sql的id同名。
     * Mapper接口方法的输入参数类型和PojoMapper.xml中定义的sql的parameterType类型相同。
     * Mapper接口的返回类型和PojoMapper.xml中定义的sgl的resultType类型相同
@@ -543,5 +544,51 @@ MyBatis为我们提供了解决方案：接口代理。开发者只编写实体�
 5. 断开连接
 
 而现在我们在声明Mapper接口后，只需要对应其中每一个方法给出sql语句即可（当然Mapper接口和mapper映射文件的定义必须严格遵守上面的要求），其余的步骤都由MyBatis替我们完成。这其实就吻合了`代理模式`这一设计模式。
+
+之前我们在MyBatisConfig.xml中使用的是单个mapper的方式来注册，现在把PojoMapper接口和PojoMapper.xml放在mapper包下就可以使用包注册：
+```xml
+<mappers>
+    <package name="edu.seu.mapper"/>
+</mappers>
+```
+#### 调用方法
+下面就可以做测试，使用session.getMapper来自动创建接口的实例：
+```java
+@Test
+public void execute() {
+    CommunityMapper mapper=session.getMapper(CommunityMapper.class);
+    List<Community> list=mapper.getAllCommunity();
+    list.forEach(System.out::println);
+}
+```
+
+### 视图层与控制层使用Spring MVC
+以录入新的社区信息为例，在community_add.jsp中编写表单填入社区信息并将action指向我们的Controller/Method：
+```java
+@Controller
+@RequestMapping("/com")
+public class CommunityController extends AbstractSessionGetter{
+
+    @RequestMapping("/add")
+    public ModelAndView add(Community community) {
+        ModelAndView mv = new ModelAndView();
+        this.get();
+        CommunityMapper mapper=session.getMapper(CommunityMapper.class);
+        int n=mapper.insertCommunity(community);
+        session.commit();
+        if (n > 0) {
+            mv.addObject("com", community);
+            mv.setViewName("community_show");
+        } else {
+            mv.addObject("num",n);
+            mv.setViewName("message");
+        }
+        this.close();
+        return mv;
+    }
+}
+```
+我们将SqlSessionFactory和SqlSession以及获得、关闭session的方法放在AbstractSessionGetter中以便于多个PojoController重用。每次在相应Method中使用MyBatis接口代理获得PojoMapper，进一步使用该mapper执行数据库操作。执行之后根据结果响应对应的视图。
+
 ***
 **未完待续**
