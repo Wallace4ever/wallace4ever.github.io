@@ -590,5 +590,6 @@ public class CommunityController extends AbstractSessionGetter{
 ```
 我们将SqlSessionFactory和SqlSession以及获得、关闭session的方法放在AbstractSessionGetter中以便于多个PojoController重用。每次在相应Method中使用MyBatis接口代理获得PojoMapper，进一步使用该mapper执行数据库操作。执行之后根据结果响应对应的视图。
 
+Spring MVC的Controller是默认采用了单例模式，在首次被请求时创建并可以被多个请求共用。如果要使用多例模式，可以对该Controller使用`@Scope`注解。
 ***
 **未完待续**

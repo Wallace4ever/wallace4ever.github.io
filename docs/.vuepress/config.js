@@ -90,6 +90,7 @@ module.exports = {
       }
     ],
     //其他配置
+    'codeTheme': 'tomorrow',
     "logo": "/logo.png",
     "search": true,
     "searchMaxSuggestions": 10,
