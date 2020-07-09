@@ -563,19 +563,48 @@ public void execute() {
 ```
 
 ### 视图层与控制层使用Spring MVC
+我们将SqlSessionFactory和SqlSession以及获得、关闭session的方法放在AbstractSessionGetter中以便于多个PojoController重用。
+```java
+public abstract class AbstractSessionGetter {
+    SqlSessionFactory ssf;
+    SqlSession session;
+
+    public AbstractSessionGetter() {
+        InputStream inputStream= null;
+        try {
+            inputStream = Resources.getResourceAsStream("MyBatisConfig.xml");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        ssf= new SqlSessionFactoryBuilder().build(inputStream);
+        getSession();
+    }
+
+    public void getSession() {
+        session=ssf.openSession();
+    }
+
+    public void closeSession() {
+        System.out.println("Closing...");
+        session.close();
+        session=null;
+    }
+}
+```
 以录入新的社区信息为例，在community_add.jsp中编写表单填入社区信息并将action指向我们的Controller/Method：
 ```java
-@Controller
-@RequestMapping("/com")
 public class CommunityController extends AbstractSessionGetter{
+    //实例化时先执行父类的构造方法再初始化子类的成员变量，所以这里session已经获取到了
+    CommunityMapper mapper=session.getMapper(CommunityMapper.class);
 
     @RequestMapping("/add")
     public ModelAndView add(Community community) {
         ModelAndView mv = new ModelAndView();
-        this.get();
-        CommunityMapper mapper=session.getMapper(CommunityMapper.class);
+        //通过MyBatis接口代理，使用mapper接口的对应方法操作数据库
+        //取代了直接使用JDBC的方式
         int n=mapper.insertCommunity(community);
         session.commit();
+        //根据结果设置Spring MVC 视图
         if (n > 0) {
             mv.addObject("com", community);
             mv.setViewName("community_show");
@@ -583,13 +612,20 @@ public class CommunityController extends AbstractSessionGetter{
             mv.addObject("num",n);
             mv.setViewName("message");
         }
-        this.close();
         return mv;
     }
 }
 ```
-我们将SqlSessionFactory和SqlSession以及获得、关闭session的方法放在AbstractSessionGetter中以便于多个PojoController重用。每次在相应Method中使用MyBatis接口代理获得PojoMapper，进一步使用该mapper执行数据库操作。执行之后根据结果响应对应的视图。
+使用MyBatis接口代理获得PojoMapper，进一步使用该mapper执行数据库操作。执行之后根据结果响应对应的视图。这样Spring MVC 和 MyBatis的简单整合就完成了。
 
 Spring MVC的Controller是默认采用了单例模式，在首次被请求时创建并可以被多个请求共用。如果要使用多例模式，可以对该Controller使用`@Scope`注解。
-***
-**未完待续**
+
+接下来，针对更多的增删改查请求，使用数据绑定获得客户端传过来的数据（如果有的话），使用mapper中设计的接口传入参数并得到结果（集），将结果放在对应的视图中以响应给客户端。
+
+在完成一个模块（社区）的编写后，可以进一步完成其他模块（住户、记录）的增删改查功能。
+
+:::warning
+显示住户信息时需要显示小区的名称，而查询resident表时只有小区的id，为避免为每个住户在数据库中查询一次对应的社区信息，可以在web项目启动时查询到社区的List并转为Map存放在application容器中，这样就能大大提升效率。
+
+值得注意的是，如果在EL表达式中调用了一次方法（例如map.get(Key)），该方法的参数就不能再使用EL表达式来取，这样看来EL表达式还是有一些局限。
+:::
