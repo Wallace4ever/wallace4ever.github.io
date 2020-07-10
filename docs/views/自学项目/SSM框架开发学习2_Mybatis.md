@@ -13,7 +13,7 @@ categories:
 
 ## 初识Mybatis
 ### 配置项目
-首先我们创建一个基于Maven的只使Mybatis的非web项目来认识Mybatis。
+首先我们基于Maven创建一个只使用Mybatis的非web项目来认识Mybatis。
 1. 在pom.xml中导入mybatis、log4j、junit、mysql驱动等依赖并添加项目对应目录到资源文件的扫描目录。
 :::details
 ```xml
@@ -356,7 +356,7 @@ mapper:
 ```
 
 ## Mybatis查询到POJO的关联映射
-关联关系是面向对象分析、面向对象设计最终的思想，MyBatis的关联映射可以大大简化持久层的数据访问。关联关系大致可分为：
+关联关系是面向对象分析、面向对象设计最终的思想，MyBatis的关联映射可以大大简化持久层的数据访问。数据库中的关联关系大致可分为：
 1. 一对一：例如居民与身份证，任意一方持有对方的id
 2. 一对多：例如班级与学生，多的一方持有另一方的id
 3. 多对多：例如商品与订单，使用中间表/关系表持有双方的id
@@ -410,7 +410,7 @@ ALTER TABLE table DROP id;
 ALTER TABLE table ADD id INT NOT NULL PRIMARY KEY AUTO_INCREMENT FIRST
 ```
 
-### 多对一关系
+### POJO多对一关系体现
 在数据库中一对多和多对一体现形式是一样的（主键与外键），只是我们在POJO中的体现有所不同。
 
 如果要执行如下所示的多表查询：
@@ -453,7 +453,7 @@ ALTER TABLE table ADD id INT NOT NULL PRIMARY KEY AUTO_INCREMENT FIRST
 2. POJO：n一方包含一个1那一方的属性
 3. MyBatis：自定义resultMap返回n一方并通过association关联1那一方。
 
-### 一对多关系
+### POJO一对多关系体现
 在pojo的`1`类中添加`n`类的容器比如Community类中增加属性`List<Resident>`。对于容器我们需要在resultMap中添加`<collection>`标签
 ```xml
 <resultMap id="commInfo" type="pojo.Community">
@@ -471,7 +471,7 @@ ALTER TABLE table ADD id INT NOT NULL PRIMARY KEY AUTO_INCREMENT FIRST
 </resultMap>
 ```
 
-### 多对多关系
+### POJO多对多关系体现
 考虑人员在小区间的流动通行需要登记，那么这就是一个多对多的关系。
 
 **例子：查询某个通行者一共到过哪几个社区**，那么对应的Mapper为
@@ -629,3 +629,12 @@ Spring MVC的Controller是默认采用了单例模式，在首次被请求时创
 
 值得注意的是，如果在EL表达式中调用了一次方法（例如map.get(Key)），该方法的参数就不能再使用EL表达式来取，这样看来EL表达式还是有一些局限。
 :::
+
+## 知识总结
+MyBatis这一ORM框架使用起来能很快上手，只需要在项目依赖中导入MyBatis和对应的数据库驱动并配置好其核心配置文件就能跑起来。该文件主要配置了数据库环境、数据库连接信息和mappers。在项目中使用时读取该配置文件并被SqlSessionFactoryBuilder用来创建SqlSessionFactory，进一步获得新的SqlSession。为提升效率，获得的SqlSession是可以被重复使用的（在Spring MVC中，Controller对象的生命周期较长在处理多个Method间可以共用）。
+
+MyBatis框架需要开发者提供SQL语句，虽然这一点相比Hibernate要做更多工作，不过这也给了开发者在复杂场景下更多优化SQL的空间。发送SQL的方式有两种:
+* 一种是直接手动通过SqlSession的selectOne/selectList/delete/insert/update等方法找到namespace.id对应的mapper执行其中的语句并返回结果
+* 另一种是使用接口代理，写好PojoMapper接口并确保mapper的namespace.id对应`接口的全限定名.方法名`，接下来使用`session.getMapper(PojoMapper.class)`来得到接口的实例，就可以直接调用接口的方法来操作数据库了
+
+无论是使用哪种方法，执行DML语句后都需要commit()，使用不带参数的sessionFactory.openSession()方法得到的session默认是不自动提交事务的。学习MyBatis，重点要理解SqlSession和映射器。

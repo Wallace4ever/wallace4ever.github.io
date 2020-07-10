@@ -102,7 +102,7 @@ module.exports = {
     "startYear": "2019"
   },
   "markdown": {
-    "lineNumbers": false
+    "lineNumbers": true
   },
   "plugins": [
   [
