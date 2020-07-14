@@ -115,6 +115,219 @@ init方法在创建时就会执行，但由于IOC容器的机制destroy方法并
 </beans>
 ```
 
-## Bean的依赖关系
+## Bean的依赖注入
+我们使用Spring在Bean的配置中可以通过`<property>`标签来预先为其注入属性，name说明对哪个属性赋值，value说明要赋的值。
+
+### 基于setter方法的属性注入
+属性注入：
+```xml
+<bean id="cat1" class="edu.seu.pojo.Category">
+    <property name="count" value="0"/>
+    <property name="name" value="儿童文学"/>
+    <property name="note" value="小孩子看的书"/>
+</bean>
+```
+如果一个POJO中持有另一个POJO的引用，那么在配置好后者的Bean后，可以在前者的配置中注入对后者的依赖：
+```xml
+    <bean id="b4" class="edu.seu.pojo.Book">
+        <property name="author" value="曹文轩"/>
+        <property name="isdn" value="1131231"/>
+        <property name="price" value="23.9"/>
+        <property name="title" value="草房子"/>
+        <!-- 使用ref而不是value来声明对已有的Bean的依赖 -->
+        <property name="category" ref="cat1"/>
+    </bean>
+```
+
+### 基于构造方法的属性注入
+在Bean元数据配置中通过`<constructor-arg>`标签来使用构造方法注入属性，这种方式必须要和POJO已有的构造方法的参数完全匹配。
+```xml
+    <bean id="cat2" class="edu.seu.pojo.Category">
+        <constructor-arg name="count" value="1"/>
+        <constructor-arg name="name" value="历史小说"/>
+        <constructor-arg name="note" value="适合成人阅读"/>
+    </bean>
+
+    <bean id="b5" class="edu.seu.pojo.Book">
+        <constructor-arg name="title" value="明朝那些事"/>
+        <constructor-arg name="author" value="当年明月"/>
+        <constructor-arg name="isdn" value="34243"/>
+        <constructor-arg name="price" value="55.5"/>
+        <!-- 依赖注入 -->
+        <constructor-arg name="category" ref="cat2"/>
+        <!-- 或者使用type -->
+        <constructor-arg type="edu.seu.pojo.Category" ref="cat3"/>
+    </bean>
+```
+
+### 注入内部Bean
+Java中有内部类，对应地Spring也有内部Bean。在对应的property标签内加入一个Bean就可以了，该内部Bean的id是无意义的，只能被它的外部Bean使用，而不能被其他的Bean使用。 
+```xml
+    <bean id="b6" class="edu.seu.pojo.Book">
+        <property name="title" value="编程珠玑"/>
+        <property name="price" value="90.9"/>
+        <property name="isdn" value="34143123"/>
+        <property name="author" value="Jon Bentley"/>
+        <property name="category">
+            <bean class="edu.seu.pojo.Category" id="cat3">
+                <property name="note" value="适合程序员阅读"/>
+                <property name="name" value="编程书籍"/>
+                <property name="count" value="5"/>
+            </bean>
+        </property>
+    </bean>
+```
+
+### 注入集合
+Spring提供了4种类型的集合配置元素：
+|元素|描述|
+|--|--|
+|`<list>`|允许重复，对应Java List接口|
+|`<set>`|不允许重复，对应Java Set接口|
+|`<map>`|键值对，对应Java Map接口|
+|`<props>`|键值对，约束键值都是字符串|
+
+#### List和Set
+我们在Category类中添加属性`private List<Book> bookList;`与相应的get/set方法，接下来就可以在配置Bean的时候使用list标签。set标签同理，只不过不包含重复元素。
+```xml
+    <bean id="cat3" class="edu.seu.pojo.Category">
+        <property name="count" value="0"/>
+        <property name="name" value="儿童文学"/>
+        <property name="note" value="小孩子看的书"/>
+        <property name="bookList">
+            <list>
+                <ref bean="b4"/>
+                <ref bean="b5"/>
+                <!-- 如果是基本包装类型就使用value标签-->
+            <!--<value>张三</value>-->
+            </list>
+        </property>
+    </bean>
+```
+#### Map和Props
+在property标签内通过map标签来添加多个entry。
+```xml
+    <bean id="cat4" class="edu.seu.pojo.Category">
+        <property name="count" value="0"/>
+        <property name="name" value="儿童文学"/>
+        <property name="note" value="小孩子看的书"/>
+        <property name="bookMap">
+            <map>
+                <entry key="1" value="小星星"/>
+                <entry key="2" value="小王子"/>
+                <entry key="3" value="小马过河"/>
+                <!-- 自定义引用类型用key-ref和value-ref -->
+            </map>
+        </property>
+    </bean>
+```
+而`<props>`标签对应的是java.util.Properties类，只支持字符串。
+```xml
+    <bean id="cat5" class="edu.seu.pojo.Category">
+        <property name="count" value="0"/>
+        <property name="name" value="儿童文学"/>
+        <property name="note" value="小孩子看的书"/>
+        <property name="bookProps">
+            <props>
+                <prop key="1">小星星</prop>
+                <prop key="2">小王子</prop>
+                <prop key="3">小马过河</prop>
+            </props>
+        </property>
+    </bean>
+```
+#### 数组的注入
+数组不属于JCF框架，可以用array和value标签来注入数组。
+```xml
+    <bean id="cat5" class="edu.seu.pojo.Category">
+        <property name="count" value="0"/>
+        <property name="name" value="儿童文学"/>
+        <property name="note" value="小孩子看的书"/>
+        <property name="books">
+            <array>
+                <value>小星星</value>
+                <value>小马过河</value>
+                <value>灰姑娘</value>
+            </array>
+        </property>
+    </bean>
+```
+
+### 自动装配
+默认情况下，我们需要手动为每一个Bean注入属性，在注入有大量元素的集合时就显得很不方便。我们在配置一个`<bean>`的时候可以通过显式地指明其`autowire`属性来使用自动装配。
+|模式|描述|
+|--|--|
+|no|默认，没有自动装配|
+|byName|由属性名自动装配。Spring容器看到在XML配置文件中bean的自动装配的属性设置为byName。然后尝试匹配,并且将它的属性与在配置文件中被定义为相同名称的beans的属性进行连接。|
+|byType|由属性数据类型自动装配。如果Bean的类型 匹配配置文件中的一个确切的bean名称,它将尝试匹配和连接属性的类型。如果存在不止一个这样的 bean，就会抛出异常。|
+|constructor|类似于byType ,但该类型适用于构造函数参数类型。如果在容器中没有一个构造函数参数类型的bean就会抛出异常|
+|autodetect|Spring首先尝试通过constructor来连接，如果它不执行就尝试通过byType来自动装配|
+
+#### byName
+假设我们地Book类有如下属性并设有相应地get/set、toString方法，其中category是Category类型的属性：
+```java
+public class Book {
+    private String title;
+    private String author;
+    private String isdn;
+    private double price;
+    private Category category;
+}
+```
+那么我们可以首先配置一个id为`category`的Category Bean，这里的id要和POJO中的属性名相同。
+```xml
+    <bean id="category" class="edu.seu.pojo.Category">
+        <property name="name" value="儿童文学"/>
+        <property name="count" value="100"/>
+        <property name="note" value="说明"/>
+    </bean>
+```
+接下来就可以在Book Bean中使用autowire：
+```xml
+    <bean id="b1" class="edu.seu.pojo.Book" autowire="byName">
+        <property name="author" value="冰心"/>
+        <property name="isdn" value="1233424324"/>
+        <property name="price" value="23.5"/>
+        <property name="title" value="小读者"/>
+        <!--这里我们没有显式地用value-ref连接categoty Bean-->
+    </bean>
+```
+测试：
+```java
+    ApplicationContext ac;
+    @Before
+    public void before() {
+        ac= new ClassPathXmlApplicationContext("applicationContext2.xml");
+    }
+
+    @Test
+    public void test1() {
+        Book book=(Book)ac.getBean("b1");
+        System.out.println(book);
+    }
+```
+在输出地结果中，可以看到该Bean地category属性已经被正确地注入了。
+
+#### byType
+与上面相似，我们将autowire设为"byType"，如果没有可匹配地Bean注入地值就为null，如果有多个同类型地Bean那么就无法自动装配。
+```xml
+    <bean id="b2" class="edu.seu.pojo.Book" autowire="byType">
+        <property name="author" value="冰心"/>
+        <property name="isdn" value="1233424324"/>
+        <property name="price" value="23.5"/>
+        <property name="title" value="小读者"/>
+    </bean>
+```
+#### constructor
+这种方式是通过构造方法对属性进行注入时的自动注入。如果有且仅有一个类型与当前Bean属性匹配的Bean那么就会注入（id不一定要匹配，即byType）；如果有多个类型与之匹配的Bean，那么会选择id匹配的Bean；如果有多个类型相匹配的Bean但没有其中一个Bean的id与当前Bean的属性相匹配，则无法确定要注入哪一个，会抛出异常。
+```xml
+    <bean id="b3" class="edu.seu.pojo.Book" autowire="constructor">
+        <constructor-arg name="title" value="明朝那些事"/>
+        <constructor-arg name="author" value="当年明月"/>
+        <constructor-arg name="isdn" value="34243"/>
+        <constructor-arg name="price" value="55.5"/>
+    </bean>
+```
+
 ****
 **未完待续**

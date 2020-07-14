@@ -148,7 +148,7 @@ lambda表达式基本语法：
 ```
 
 ### 在哪里以及如何使用lambda
-可以针对函数式接口（只有一个抽象方法的接口，空接口或者继承的接口不是函数式接口）使用lambda：
+可以且必须针对函数式接口（只有一个抽象方法的接口，空接口或者继承的接口不是函数式接口）使用lambda：
 ```java
 Runnable r1 = () -> System.out.println("Hello world");
 Runnabel r2 = new Runnable{
@@ -187,18 +187,58 @@ List<String> nonEmpty = filter(listOFStrings, nonEmptyStringPredicate);
 | `BiConsumer<T,U>` | `(T,U) -> void` | `ObjIntConsumer<T>, ObjLongConsumer<T>, ObjDoubleConsumer<T>` |
 | `BiFunction<T,U,R>` | `(T,U) -> R` | `ToIntBiFunction<T,U>, ToLongBiFunction<T,U>, ToDoubleBiFunction<T,U>` |
 
-### Lambdas及函数式接口的例子
+### lambda和匿名内部类的区别
+匿名内部类仍然是一个类，只是编译器会自动为该类取名，编译后会生成该类对应的class字节码文件；而lambda表达式在编译后会被封装成主类的一个私有方法，并通过invokedynamic指令调用。这样，我们就可以知道在lambda中的`this`指向的就是主类对象，而内部类中的this指向该内部类对象本身。
 
-| 使用案例 | Lambda 的例子 | 对应的函数式接口 |
-|:-----:|:--------|:-------|
-| 布尔表达式 | `(List<String> list) -> list.isEmpty()` | `Predicate<List<String>>` |
-| 创建对象 | `() -> new Project()` | `Supplier<Project>` |
-| 消费一个对象 | `(Project p) -> System.out.println(p.getStars())` | `Consumer<Project>` |
-| 从一个对象中选择/提取 | `(int a, int b) -> a * b` | `IntBinaryOperator` |
-| 比较两个对象 | `(Project p1, Project p2) -> p1.getStars().compareTo(p2.getStars())` | `Comparator<Project> 或 BiFunction<Project, `  `Project, Integer> 或 ToIntBiFunction<Project, Project>` |
+## Java集合框架（JCF）中的函数式接口
+下表所示的是JCF一些接口在Java8中增加的新方法，他们大部分要用到`java.util.function`包下的接口，这意味着这些方法大部分跟lambda表达式有关。
+|接口名|在Java8中新加入的方法|
+|--|--|
+|Collection|removeIf() spliterator() stream() parallelStream() forEach()
+|List|replaceAll() sort()
+|Map|getOrDefault() forEach() replaceAll() putIfAbsent() remove() replace() computeIfAbsent() computeIfPresent() compute() merge()
 
-## lambda进阶
+### Collection接口
+***forEach()***
 
+该方法签名为`void forEach(Consumer<? super E> action)`，作用是对容器中的每个元素执行action指定的动作。
+```java
+ArrayList<String> list = new ArrayList<>(Arrays.asList("I", "love", "you", "too"));
+list.forEach( str -> {
+        if(str.length()>3)
+            System.out.println(str);
+    });
+```
+
+***removeIf()***
+
+该方法签名为`boolean removeIf(Predicate<? super E> filter)`，作用是删除容器中所有满足filter指定条件的元素。
+```java
+ArrayList<String> list = new ArrayList<>(Arrays.asList("I", "love", "you", "too"));
+list.removeIf(str -> str.length()>3); // 删除长度大于3的元素
+```
+
+***replaceAll()***
+
+该方法签名为`void replaceAll(UnaryOperator<E> operator)`，作用是对每个元素执行operator指定的操作，并用操作结果来替换原来的元素。
+```java
+ArrayList<String> list = new ArrayList<>(Arrays.asList("I", "love", "you", "too"));
+list.replaceAll(str -> {
+    if(str.length()>3)
+        return str.toUpperCase();
+    return str;
+});
+```
+
+***sort()***
+
+JDK1.7前该方法在Colections工具类中，方法签名为`void sort(Comparator<? super E> c)`，该方法根据c指定的比较规则对容器元素进行排序。
+```java
+ArrayList<String> list = new ArrayList<>(Arrays.asList("I", "love", "you", "too"));
+list.sort((str1, str2) -> str1.length()-str2.length());
+```
+
+此外，spliterator()方法返回容器的可拆分迭代器`Spliterator<E>`，该迭代器既可以逐个迭代，也可以通过调用自身trysplit()方法获得拆分后的另一半迭代器，可以通过多次调用trySplit()来分解负载便于多线程处理；stream()和parallelStream()返回该容器的Stream视图表示，Stream是Java函数式编程的核心类。
 
 ***
 **未完待续**
