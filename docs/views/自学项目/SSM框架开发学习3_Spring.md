@@ -329,5 +329,116 @@ public class Book {
     </bean>
 ```
 
+## Spring注解
+传统Spring做法使用.xml文件来对Bean进行注入或者配置AOP事务，这么做有两个缺点：
+1. 如果所有内容都配置在xml中，那么该文件会变得十分庞大；如果按需分开xml文件那么文件数量又会变得非常多。这都将导致配置文件的可读性和可维护性降低。
+2. 开发中在.java和.xml文件间不断切换，思维上的不连贯也会降低效率。
+
+Spring提供了注解的方式来注册和使用Bean。
+
+### 基于创建对象的注解
+**1. @Component**
+
+作用：相当于配置了一个bean标签，可以配置属性value，作用是指定bean的id，如果不配置默认值是当前类的短名首字母改小写。
+
+我们之前可以使用xml注册一个bean：
+```xml
+<bean name="zoo1" class="edu.seu.pojo.Zoo">
+    <property name="name" value="红山森林动物园"/>
+</bean>
+```
+现在可以使用Component注解，在这之前需要在beans头部加入xml命名空间xmlns:context和相应的schemaLocation，并配置扫描指定包中的注解：
+```xml
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd"
+       >
+    <context:component-scan base-package="edu.seu.pojo"/>
+```
+接下来就可以使用注解了：
+```java
+package edu.seu.pojo;
+import org.springframework.stereotype.Component;
+@Component("z1")//不配置这个value默认为"zoo"
+public class Zoo {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public String toString() {
+        return "Zoo{" +
+                "name='" + name + '\'' +
+                '}';
+    }
+}
+```
+测试：
+```java
+@Test
+public void test2() {
+    ApplicationContext ac=new ClassPathXmlApplicationContext("applicationContext3.xml");
+    Zoo zoo=(Zoo)ac.getBean("z1");
+    System.out.println(zoo);
+}
+```
+现在就通过"z1"这个id取到了bean，不过由于没有属性注入，获得的bean的属性都为null或默认值，这时就需要使用`@Value`注解。
+
+**2. @Value**
+
+该注解在属性上使用，相当于在xml中使用`<property>`标签进行属性注入，不过只能注入基本类型和String类型，其他引用类型不能注入。
+```java
+@Component("z1")
+public class Zoo {
+    @Value("海底世界")
+    private String name;
+
+    //getter&setter&toString
+}
+```
+这时取得的bean就有相应的属性值了。
+
+**3. @Autowired**
+
+上面我们通过@Value只能注入基本数据类型和String类型，而要想注入其他的引用类型则需要使用@Autowired注解。该注解默认按照类型匹配的方式，在容器中查找匹配的Bean，有且仅有一个匹配的Bean时就将其注入@Autowired标注的变量中。该注解默认使用ByType方式，如果有多个类型匹配的则使用ByName，如果每一个Bean都不匹配则抛出异常。
+```java
+@Component("t1")
+public class Tiger {
+    @Value("东北虎")
+    private String name;
+    @Autowired
+    private Zoo zoo; //如果IOC容器中注册的Bean只有一个Zoo类的话就注入那个Bean
+    //getter&setter&toString
+}
+```
+如果使用了@Autowired注解，那么对应属性的setter方法可以省略（在xml中进行依赖注入的时候必须要有setter方法），但一般不省略。
+
+如果设置`@Autowired(required=false)`，则在找不到匹配的Bean时也不会抛出异常（而是把相应属性设为null），当然有多个同类且无法使用ByName方式的Bean时依然会抛出异常。
+
+**4. @Qualifier**
+
+如果容器中有一个以上匹配的Bean，则可以通过@Qualifier注解限定Bean的名称，该注解的属性为value，用于指定bean的id/name。该注解不能独立使用，必须和@Autowired配合使用。
+```java
+@Component("t1")
+public class Tiger {
+    @Value("东北虎")
+    private String name;
+    @Autowired
+    @Qualifier("zoo1")//假设有多个n不能用ByType和ByName匹配的Bean
+    private Zoo zoo;
+    //...
+}
+```
+
+
 ****
 **未完待续**
