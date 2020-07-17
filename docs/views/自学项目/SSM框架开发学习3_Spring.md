@@ -334,10 +334,11 @@ public class Book {
 1. 如果所有内容都配置在xml中，那么该文件会变得十分庞大；如果按需分开xml文件那么文件数量又会变得非常多。这都将导致配置文件的可读性和可维护性降低。
 2. 开发中在.java和.xml文件间不断切换，思维上的不连贯也会降低效率。
 
-Spring提供了注解的方式来注册和使用Bean。
+Spring提供了注解的方式来注册和使用Bean。一般有两种注解：
+1. 使用Bean：将配置好的Bean拿来用，完成属性、方法的组装，例如@Autowired（默认按照类型装配）、@Resource（默认按照名称装配，如果没有指定name属性，并且按照默认的名称仍然找不到依赖的对象时候，会回退到按照类型装配，但一旦指定了name属性，就只能按照名称装配了。）
+2. 注册Bean：将你要实例化的对象转化成一个Bean放在IoC容器中，要使用时结合使用Bean的注解将对象属性方法组装起来。例如@Component、@Repository、@COntroller、@Service、@Configuration
 
-### 基于创建对象的注解
-**1. @Component**
+### @Component
 
 作用：相当于配置了一个bean标签，可以配置属性value，作用是指定bean的id，如果不配置默认值是当前类的短名首字母改小写。
 
@@ -393,7 +394,7 @@ public void test2() {
 ```
 现在就通过"z1"这个id取到了bean，不过由于没有属性注入，获得的bean的属性都为null或默认值，这时就需要使用`@Value`注解。
 
-**2. @Value**
+### @Value
 
 该注解在属性上使用，相当于在xml中使用`<property>`标签进行属性注入，不过只能注入基本类型和String类型，其他引用类型不能注入。
 ```java
@@ -407,7 +408,7 @@ public class Zoo {
 ```
 这时取得的bean就有相应的属性值了。
 
-**3. @Autowired**
+### @Autowired
 
 上面我们通过@Value只能注入基本数据类型和String类型，而要想注入其他的引用类型则需要使用@Autowired注解。该注解默认按照类型匹配的方式，在容器中查找匹配的Bean，有且仅有一个匹配的Bean时就将其注入@Autowired标注的变量中。该注解默认使用ByType方式，如果有多个类型匹配的则使用ByName，如果每一个Bean都不匹配则抛出异常。
 ```java
@@ -424,7 +425,7 @@ public class Tiger {
 
 如果设置`@Autowired(required=false)`，则在找不到匹配的Bean时也不会抛出异常（而是把相应属性设为null），当然有多个同类且无法使用ByName方式的Bean时依然会抛出异常。
 
-**4. @Qualifier**
+### @Qualifier
 
 如果容器中有一个以上匹配的Bean，则可以通过@Qualifier注解限定Bean的名称，该注解的属性为value，用于指定bean的id/name。该注解不能独立使用，必须和@Autowired配合使用。
 ```java
@@ -438,6 +439,12 @@ public class Tiger {
     //...
 }
 ```
+
+### @Scope
+
+该注解的作用是指定Bean的作用范围；属性：value，指定范围值；value的取值：singleton（单例）、prototype（原型）、request（请求）、session（会话）、globalsession（全局application）。
+
+单例模式在IOC容器初始化时对象就已经创建好，而原型模式在要取用Bean时才创建对象，并且创建的是不同的对象。
 
 
 ****

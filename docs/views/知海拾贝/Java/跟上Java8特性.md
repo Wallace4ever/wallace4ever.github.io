@@ -240,5 +240,108 @@ list.sort((str1, str2) -> str1.length()-str2.length());
 
 此外，spliterator()方法返回容器的可拆分迭代器`Spliterator<E>`，该迭代器既可以逐个迭代，也可以通过调用自身trysplit()方法获得拆分后的另一半迭代器，可以通过多次调用trySplit()来分解负载便于多线程处理；stream()和parallelStream()返回该容器的Stream视图表示，Stream是Java函数式编程的核心类。
 
+### Map接口
+***forEach()***
+
+Map接口中的forEach方法内使用的函数式接口时BiConsumer，其默认方法传入两个参数(Key,Value)->void。例如：输出Map中所有的映射关系：
+```java
+HashMap<Integer, String> map = new HashMap<>();
+map.put(1, "one");
+map.put(2, "two");
+map.put(3, "three");
+map.forEach((k, v) -> System.out.println(k + "=" + v));
+}
+```
+不过在昨天（7.15）做的试题中，我选择对整个entry集合根据value属性进行自定义堆排序，而结果又要求输出Key，所以需要以一个entry为单位进行操作，这时候用lambda表达式反而不方便了。
+
+***getOrDefault()***
+
+该方法没有用到函数式接口，不过也是1.8中新增的而且比较有用，作用是查询Map中是否有指定键值对应的Value，没有则返回一个默认Value。省去了查询指定键值是否存在的麻烦，例如昨天的题目中使用Map来统计每个网站的访问总次数和总时长：
+```java
+Map<String, TimeAndCount> map = new HashMap<>();
+while (scanner.hasNextLine()) {
+    String record = scanner.nextLine();
+    String[] details = record.split(" ");
+    if (details.length != 3) break;
+    TimeAndCount entry = map.getOrDefault(details[1],new TimeAndCount(0,0));
+    entry.accessCount += 1;
+    entry.totalTime += Integer.parseInt(details[2]);
+    map.put(details[1],entry);
+}
+```
+
+***putIfAbsent()***
+
+该方法也没有用到函数接口，签名为 V putIfAbsent(K key,V value)，仅当不存在key值的映射或者映射为null时才把value值放到map中，否则不放入value。返回之前key映射的值。
+
+***remove(K,V)***
+
+1.7及之前，可以根据Key删除映射关系，1.8新增了remove(K,V)方法，仅当对应的映射关系存在时才删除。
+
+***replace()***
+
+1.7及之前，要实现替换可以使用put用新值替换旧值，1.8新增了两个replace()方法：
+1. replace(K,V)：只有K在map中存在映射时才将value替换为V。
+2. replace(K,oldV,newV)：只有map中存在映射(K,oldV)时才将oldV替换为newV。
+
+***replaceAll()***
+
+该方法作用是对Map中的每个映射执行function指定的操作，并用function的执行结果替换原来的value。例如：假设有一个数字到对应英文单词的Map，请将原来映射关系中的单词都转换成大写。
+如果使用匿名内部类的方式写法为：
+```java
+HashMap<Integer, String> map = new HashMap<>();
+map.put(1, "one");
+map.put(2, "two");
+map.put(3, "three");
+map.replaceAll(new BiFunction<Integer, String, String>(){
+    @Override
+    public String apply(Integer k, String v){
+        return v.toUpperCase();
+    }
+});
+```
+现在使用lambda表达式：
+```java
+HashMap<Integer, String> map = new HashMap<>();
+map.put(1, "one");
+map.put(2, "two");
+map.put(3, "three");
+map.replaceAll((k, v) -> v.toUpperCase());
+```
+
+***merge()***
+
+该方法签名为merge(K key, V value, BiFunction<? super V,? super V,? extends V> remappingFunction)，是将value合并到key的映射上，如果key的映射不存在或者为null则将value映射到key上，否则将原来的valueOld和新value作为参数传给BiFunction，将新的计算结果映射到key。如果新结果为null则删除映射。例如要拼接错误信息：
+```java
+map.merge(key, newMsg, (v1, v2) -> v1+v2);
+```
+
+***compute()***
+
+该方法签名为compute(K key, BiFunction<? super K,? super V,? extends V> remappingFunction)，作用是把remappingFunction的计算结果关联到key上，如果计算结果为null，则在Map中删除key的映射。
+上面的merge也可以用compute来实现：
+```java
+map.compute(key, (k,v) -> v==null ? newMsg : v.concat(newMsg));
+```
+
+***computeIfAbsent()与computeIfPresent***
+
+computeIfAbsent()的签名为V computeIfAbsent(K key, Function<? super K,? extends V> mappingFunction)，作用是在map中不存在key时，建立key到Function计算出的Value的映射。否则返回之前的value。
+
+computeIfPresent()签名为V computeIfPresent(K key, BiFunction<? super K,? super V,? extends V>，只有在当前Map中存在key值的映射且非null时，才调用remappingFunction。如果remappingFunction执行结果为null，则删除key的映射，否则使用该结果替换key原来的映射。
+```java
+@Test
+public void test() {
+    Map<Integer, Set<String>> map = new HashMap<>();
+    //不存在则创建映射
+    map.computeIfAbsent(1,v->new HashSet<>()).add("yes");
+    //存在则返回原value
+    map.computeIfAbsent(1,v->new HashSet<>()).add("or");
+    //存在则用新映射替换原来的映射
+    map.computeIfPresent(1,(k,v)->new HashSet<>()).add("no");
+    map.forEach((k,v)-> System.out.println(v));
+}
+```
+
 ***
 **未完待续**
