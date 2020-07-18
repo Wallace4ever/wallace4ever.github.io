@@ -446,6 +446,158 @@ public class Tiger {
 
 单例模式在IOC容器初始化时对象就已经创建好，而原型模式在要取用Bean时才创建对象，并且创建的是不同的对象。
 
+## Spring AOP
+Aspect Oriented Programming，面向切面编程，就是在原有的项目功能的基础上，不修改原来的功能代码以及功能逻辑，添加新的功能。
 
+Spring AOP 使用了**横向抽取**的机制：使用动态代理方式代理对象，实际上我们操作的是假对象。（对应的**纵向抽取**机制就是把公共方法写在父类里，所有的类都继承父类这样就能调用父类的方法）
+
+纵向抽取的例子：在使用JDBC时，我们可以建立DBManager类，其中包含getConn()/closeConn()等方法。接下来在编写UserDAO等DAO时，让其继承DBManager类就可以直接使用这些方法。
+
+横向抽取的例子：假设我们在一个类（或多个类）中有多个方法，现在需要统一在每个方法执行前输出欢迎语句、记录运行开始的时间，在方法执行后计算运行总时间并输出再见语句。那么这些同样的动作就是添加的新功能，每一种动作都可以看做是一个切面。
+
+我们之前学习过代理模式（主要是静态代理），目标对象和代理对象都要实现同一个接口。在静态代理中我们的核心类Singer和代理类Agent都是我们开发者手动编写到文件中的类。而在AOP中使用的动态代理的方式中，开发者只用编写核心类的核心方法，动态代理不是代理一个类文件而是代理出一个增强的代理对象，该对象在原有的核心类的方法上都增强了相关功能。
+
+### AOP术语
+我们开始使用AOP工作之前，让我们熟悉一下AOP概念和术语。这些术语并不特定于Spring，而是与AOP有关的。
+* **通知、增强处理(Advice）** ：就是在你已经实现的功能上添加其他的功能，例如打印日志，完成操作时发送短信等。
+* **连接点(JoinPoint)** ：天然存在的，和方法有关的前前后后都是连接点（可切入点）。
+* **切入点(Pointcut)** ：不是独立存在的，是某通知的切入点。上面说的连接点的基础上，你想让增强使用在什么方法之上就是切点。
+* **切面(Aspect)** ：切面是通知（增强）和切入点的结合。
+
+例如：before()、after()是通知；各方法执行前和执行后的点都是连接点；对于before而言所有方法执行前的连接点是它的切入点，对于after而言所有方法执行后的连接点是它的切入点；所有在切入点上的before和after各组成了一个切面。
+
+通知的类型：
+|通知类型|描述|
+|--|--|
+|前置通知|在一个方法执行前，执行通知|
+|后置通知|在一个方法执行后，不考虑其结果，执行通知|
+|返回后通知|在一个方法执行后，只有在其成功完成时，才执行通知|
+|抛出异常后通知|在一个方法执行后，只有在方法抛出异常时，才执行通知|
+|环绕通知|在建议方法调用之前和之后各执行一部分通知|
 ****
+
+### Spring中基于AOP的XML架构
+下面我们来建立一个简单的基于AOP的XML架构：
+1. 编写目标类（接口、实现类）
+    ```java
+    //接口
+    public interface IHello {
+        public void sayHello();
+        public void showMe();
+    }
+
+    //实现类
+    public class HelloImp1 implements IHello{
+        String name="小华";
+
+        @Override
+        public void sayHello() {
+            System.out.println("小华说：你好");
+        }
+
+        @Override
+        public void showMe() {
+            System.out.println("我是小华");
+        }
+
+        public void shout() {
+            System.out.println(name);
+        }
+    }
+
+    //同理在定义一个实现类HelloImp2
+    ```
+2. 在xml配置文件头部的beans标签中加入aop命名空间，并配置目标类的bean
+    ```xml
+    <beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+                           http://www.springframework.org/schema/aop http://http://www.springframework.org/schema/aop/spring-aop-3.0.xsd"
+       >
+    ```
+3. 编写一个切面类：是一个独立的类，里面定义了若干个通知
+    ```java
+    package edu.seu.aspect;
+
+    public class HelloAspect {
+        public void before() {
+            System.out.println("method start running");
+        }
+
+        public void after() {
+            System.out.println("method is closed");
+        }
+    }
+    ```
+4. 配置切面类的bean
+    ```xml
+    <!-- 被增强的bean -->
+    <bean id="hello1" class="edu.seu.pojo.HelloImp1"></bean>
+    <bean id="hello2" class="edu.seu.pojo.HelloImp2"></bean>
+
+    <!-- 切面类的bean -->
+    <bean id="helloAspect" class="edu.seu.aspect.HelloAspect"></bean>
+    ```
+5. 配置AOP
+    ```xml
+    <aop:config>
+        <!-- 切入点定义 -->
+        <aop:pointcut id="point1" expression="execution(* edu.seu.pojo.*.*(..))"/>
+        <aop:pointcut id="point2" expression="execution(* edu.seu.pojo.*.showMe())"/>
+        <!-- 切面 -->
+        <aop:aspect ref="helloAspect">
+            <!-- 每一个切面由通知和切入点构成 -->
+            <aop:before method="before" pointcut-ref="point1"/>
+            <aop:after method="after" pointcut-ref="point2"/>
+        </aop:aspect>
+    </aop:config>
+    ```
+
+在上面的AOP配置中，定义了两个切入点，以及指明了切面类的bean，明确切面中的通知类型并对应到切入点。测试：
+```java
+@Test
+public void test1() {
+    IHello hello1=(IHello) ac.getBean("hello1");
+    IHello hello2=(IHello)ac.getBean("hello2");
+    hello1.sayHello();
+    hello2.sayHello();
+    System.out.println(hello1);
+    System.out.println(hello2);
+    hello1.showMe();
+    hello2.showMe();
+}
+```
+before通知应用的切点是`execution(* edu.seu.pojo.*.*(..))`，表示任意返回类型的edu.seu.pojo包下任意类的任意方法（可以有任意参数），after通知应用的切点是`execution(* edu.seu.pojo.*.showMe())`，表示任意返回类型的edu.seu.pojo包下任意类的名为showMe的无参数方法。因此测试的结果中，所有方法执行前都会打印"method start running"，而仅在showMe方法之后会打印"method is closed"。
+
+**环绕通知**
+
+我们测试了前置通知和后置通知，下面来看环绕通知。我们在编写环绕通知方法的时候，环绕通知需要携带ProceedingJoinPoint这个类型的参数，该参数决定了是否执行目标方法（被增强的方法）。简单理解，环绕通知=前置通知+目标方法执行+后置通知，proceed方法就是用于启动目标方法执行的。
+```xml
+<aop:around method="around" pointcut-ref="point1"/>
+```
+
+环绕通知必须要有返回值，返回的是代理对象。
+```java
+import org.aspectj.lang.ProceedingJoinPoint;
+public Object around(ProceedingJoinPoint pj) {
+    System.out.println("这是环绕切面的前置通知");
+    Object obj=null;
+    try {
+        //代理对象
+        obj=pj.proceed();
+    } catch (Throwable throwable) {
+        throwable.printStackTrace();
+    }
+    System.out.println("环绕切面的后置通知");
+    return obj;
+}
+```
+其中`ProceedingJoinPoint pj`相当于我们的环境变量，通过执行proceed方法可以获得当前的代理对象。如果这里不返回的话那么我们获得的代理对象就为null。
+
+
+### Spring中基于AOP的注解实现
 **未完待续**
