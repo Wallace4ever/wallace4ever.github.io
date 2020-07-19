@@ -598,6 +598,27 @@ public Object around(ProceedingJoinPoint pj) {
 ```
 其中`ProceedingJoinPoint pj`相当于我们的环境变量，通过执行proceed方法可以获得当前的代理对象。如果这里不返回的话那么我们获得的代理对象就为null。
 
-
 ### Spring中基于AOP的注解实现
-**未完待续**
+1. 用@Component注解被增强的Bean，在配置文件中启用spring-context命名空间，并通过`<context:component-scan base-package="edu.seu"/>`来启用对该包及所有子包下被注解为@Componennt的Bean的扫描，通过`<aop:aspectj-autoproxy/>`来声明自动为spring容器中那些配置@Aspect切面的bean创建代理，织入切面。
+2. 定义切面类@Aspect，注解在切面类上，相当于注册Bean
+3. 定义切点：因为注解只能注解在方法、类、变量上面，而切面类和下面的通知都要被注解，所以要定义切点就需要创建一个空方法，其作用是使得能够有地方去注解一个切点。方法名等于切点名。
+    ```java
+    @Pointcut("execution(* edu.seu.pojo.*.*(..))")
+    public void point1() {}
+    ```
+4. 定义切面：可以使用@Before、@After和@Around等。使用上面定义的切点的空方法名作为pointcut-ref。
+    ```java
+    @Before("point1()")
+    public void before() {
+        System.out.println("method start running");
+    }
+
+    @After("point1()")
+    public void after() {
+        System.out.println("method is closed");
+    }
+    ```
+这样，测试得到的结果就和使用XML配置的结果一样了。
+
+***
+以上这些还都只是入门Spring需要用到的一些核心知识，想要用好Spring，需要更深入地学习其各组件的开发。
