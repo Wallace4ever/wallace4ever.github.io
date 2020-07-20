@@ -476,7 +476,7 @@ Spring AOP 使用了**横向抽取**的机制：使用动态代理方式代理�
 |环绕通知|在建议方法调用之前和之后各执行一部分通知|
 ****
 
-### Spring中基于AOP的XML架构
+### Spring AOP基于XML的实现
 下面我们来建立一个简单的基于AOP的XML架构：
 1. 编写目标类（接口、实现类）
     ```java
@@ -596,9 +596,9 @@ public Object around(ProceedingJoinPoint pj) {
     return obj;
 }
 ```
-其中`ProceedingJoinPoint pj`相当于我们的环境变量，通过执行proceed方法可以获得当前的代理对象。如果这里不返回的话那么我们获得的代理对象就为null。
+其中`ProceedingJoinPoint pj`相当于我们的环境变量，通过执行proceed方法可以获得当前的代理对象。如果这里不返回的话那么我们获得的代理对象就为null。git 
 
-### Spring中基于AOP的注解实现
+### Spring AOP基于注解的实现
 1. 用@Component注解被增强的Bean，在配置文件中启用spring-context命名空间，并通过`<context:component-scan base-package="edu.seu"/>`来启用对该包及所有子包下被注解为@Componennt的Bean的扫描，通过`<aop:aspectj-autoproxy/>`来声明自动为spring容器中那些配置@Aspect切面的bean创建代理，织入切面。
 2. 定义切面类@Aspect，注解在切面类上，相当于注册Bean
 3. 定义切点：因为注解只能注解在方法、类、变量上面，而切面类和下面的通知都要被注解，所以要定义切点就需要创建一个空方法，其作用是使得能够有地方去注解一个切点。方法名等于切点名。
