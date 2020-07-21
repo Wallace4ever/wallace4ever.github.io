@@ -191,6 +191,8 @@ List<String> nonEmpty = filter(listOFStrings, nonEmptyStringPredicate);
 匿名内部类仍然是一个类，只是编译器会自动为该类取名，编译后会生成该类对应的class字节码文件；而lambda表达式在编译后会被封装成主类的一个私有方法，并通过invokedynamic指令调用。这样，我们就可以知道在lambda中的`this`指向的就是主类对象，而内部类中的this指向该内部类对象本身。
 
 ## Java集合框架（JCF）中的函数式接口
+[参考文章](https://objcoding.com/2019/03/04/lambda/#merge)
+
 下表所示的是JCF一些接口在Java8中增加的新方法，他们大部分要用到`java.util.function`包下的接口，这意味着这些方法大部分跟lambda表达式有关。
 |接口名|在Java8中新加入的方法|
 |--|--|
@@ -343,5 +345,92 @@ public void test() {
 }
 ```
 
-***
-**未完待续**
+## Stream API
+Java 8之所以费这么大功夫引入函数式编程，原因有二：
+1. 代码简洁函数式编程写出的代码简洁且意图明确，使用stream接口让你从此告别for循环。
+2. 多核友好，Java函数式编程使得编写并行程序非常简单，开发者要做的只是调用一下parallel()方法。
+
+stream并不是某种数据结构，它只是数据源的一种视图。这里的数据源可以是一个数组，Java容器或I/O channel等。正因如此要得到一个stream通常不会手动创建，而是调用对应的工具方法，比如：
+* 调用Collection.stream()或者Collection.parallelStream()方法
+* 调用Arrays.stream(T[] array)方法
+
+Java有4中stream接口继承自BaseStream，分别是IntStream、LongStream、DoubleStream和Stream，其中前三个对应三种基本类型，Stream对应剩余的基本类型和引用类型。为不同数据类型设置不同stream接口，可以提高性能并增加特定接口函数。
+
+### Stream的特点
+虽然大部分情况下stream是容器调用Collection.stream()方法得到的，但stream和collections有以下不同：
+
+1. 无存储。stream不是一种数据结构，它只是某种数据源的一个视图，数据源可以是一个数组，Java容器或I/O channel等。
+2. 为函数式编程而生。对stream的任何修改都不会修改背后的数据源，比如对stream执行过滤操作并不会删除被过滤的元素，而是会产生一个不包含被过滤元素的新stream。
+3. 惰式执行。stream上的操作并不会立即执行，只有等到用户真正需要结果的时候才会执行。
+4. 可消费性。stream只能被“消费”一次，一旦遍历过就会失效，就像容器的迭代器那样，想要再次遍历必须重新生成。
+
+对stream的操作分为为两类，中间操作(intermediate operations)和结束操作(terminal operations)，二者特点是：
+
+* 中间操作总是会惰式执行，调用中间操作只会生成一个标记了该操作的新stream，仅此而已。
+* 结束操作会触发实际计算，计算发生时会把所有中间操作积攒的操作以pipeline的方式执行，这样可以减少迭代次数。计算完成之后stream就会失效。
+
+### Stream的接口方法
+|操作类型|接口方法|
+|--|:--|
+|中间操作|	concat() distinct() filter() flatMap() limit() map() peek() skip() sorted() parallel() sequential() unordered()|
+|结束操作|	allMatch() anyMatch() collect() count() findAny() findFirst() forEach() forEachOrdered() max() min() noneMatch() reduce() toArray()|
+
+常用中间操作接口简介：
+
+filter()传入一个断言式接口，根据λ表达式返回的布尔值来筛选要保留的元素；distinct()作用是返回一个去除重复元素后的stream；sorted()可以传入一个比较器接口（或不传就按照自然顺序），返回排序后的stream；map()传入一个转换式接口，将视图中的元素按照自定规则转换为新的元素（类型可能按需改变）；flatMap()作用是将原Stream中所有元素都摊平后组成一个新的Stream，例如：
+```java
+Stream<List<Integer>> stream = Stream.of(Arrays.asList(1,2), Arrays.asList(3, 4, 5));
+stream.flatMap(list -> list.stream())
+    .forEach(i -> System.out.println(i));
+```
+注意这些接口方法都是中间操作，调用后并不会立即进行计算或输出结果。
+
+### Stream流规约
+规约操作（reduction operation）又被称作折叠操作（fold），是通过某个连接动作将所有元素汇总成一个汇总结果的过程。元素求和、求最大值或最小值、求出元素总个数、将所有元素转换成一个列表或集合，都属于规约操作。Stream类库有两个通用的规约操作reduce()和collect()，也有一些为简化书写而设计的专用规约操作，比如sum()、max()、min()、count()等。规约操作属于结束操作。
+
+**reduce()**
+
+reduce操作可以实现从一组元素中生成一个值，调用时传入一个BinaryOperator接口，其作用是传入两个同类的参数，根据一定标准选择一个或者创建一个同类的元素并返回。有三种重载写法
+```java
+Optional<T> reduce(BinaryOperator<T> accumulator)
+T reduce(T identity, BinaryOperator<T> accumulator)
+<U> U reduce(U identity, BiFunction<U,? super T,U> accumulator, BinaryOperator<U> combiner)
+```
+例如找出最长的单词:
+```java
+Stream<String> stream = Stream.of("I", "love", "you", "too");
+Optional<String> longest = stream.reduce((s1, s2) -> s1.length()>=s2.length() ? s1 : s2);
+//Optional<String> longest = stream.max((s1, s2) -> s1.length()-s2.length());
+System.out.println(longest.get());
+```
+求单词长度之和:
+```java
+
+Stream<String> stream = Stream.of("I", "love", "you", "too");
+Integer lengthSum = stream.reduce(0,　// 初始值　// (1)
+        (sum, str) -> sum+str.length(), // 累加器 // (2)
+        (a, b) -> a+b);　// 部分和拼接器，并行执行时才会用到 // (3)
+// int lengthSum = stream.mapToInt(str -> str.length()).sum();
+System.out.println(lengthSum);
+```
+:::details
+**collect()**
+
+collect()是Stream接口方法中最灵活的一个，学会它才算真正入门Java函数式编程。我短时间内消化能力确实有限，暂时只能学到这里了。。
+```java
+// 将Stream转换成容器或Map
+Stream<String> stream = Stream.of("I", "love", "you", "too");
+List<String> list = stream.collect(Collectors.toList()); // (1)
+// Set<String> set = stream.collect(Collectors.toSet()); // (2)
+// Map<String, Integer> map = stream.collect(Collectors.toMap(Function.identity(), String::length)); // (3)
+```
+:::
+
+### 方法引用
+诸如String::length的语法形式叫做方法引用（method references），这种语法用来替代某些特定形式Lambda表达式。如果Lambda表达式的全部内容就是调用一个已有的方法，那么可以用方法引用来替代Lambda表达式。方法引用可以细分为四类：
+|方法引用类别|	举例|
+|--|--|
+|引用静态方法|	Integer::sum|
+|引用某个对象的方法|	list::add|
+|引用某个类的方法|	String::length|
+|引用构造方法|	HashMap::new|
