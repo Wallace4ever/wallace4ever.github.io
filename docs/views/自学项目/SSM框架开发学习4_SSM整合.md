@@ -270,5 +270,139 @@ categories:
             * 扫描了Controller
             * 注册视图解析器bean
 
+## 练手：单表的增删改查
+前面说完了项目的资源文件（resources）配置，下面来看一下前端视图（webapp）和Java源文件的架构。
+
+1.首先，我们依然是在webapp/views目录下使用jsp模板，简要设计好与POJO对应的form与table。在Java目录下以用户管理这一应用场景为背景创建controller，由于是SSM整合，所以这次Java源文件目录下更细致地划分了包：
+* controller包：C层，控制请求的处理与前后端的数据交互。
+* service包：M层（业务逻辑），负责一次完整的数据库操作请求，接收事务的管理，可执行一组sql。
+* pojo包：M层（数据承载），封装表中的数据
+* mapper包：M层（DAO，持久化），MaBatis接口代理，接口中每一个方法执行一条sql语句。
+
+V层对应的是jsp前端视图，在MVC模型之外有时称DB为实体层。
+
+2.接下来，创建POJO类封装相应的属性，不过这次我们需要使用Spring注解`@Component`来将其交给IOC容器管理。
+:::details
+```java
+package edu.seu.pojo;
+
+import org.springframework.stereotype.Component;
+
+@Component
+public class User {
+    private int id;
+    private String name;
+    private String pwd;
+
+    public User() {
+    }
+
+    public User(int id, String name, String pwd) {
+        this.id = id;
+        this.name = name;
+        this.pwd = pwd;
+    }
+
+	//getter setter toString
+}
+```
+:::
+
+3.定义mapper（pojomapper.xml、PojoMapper.java接口）pojomapper.xml中的mapper标签的namespace属性必须要和接口的全限定名相同，sql语句的id要和方法名相同并且参数和返回值对应。
+```java
+package edu.seu.mapper;
+
+import edu.seu.pojo.User;
+
+import java.util.List;
+
+public interface UserMapper {
+    public int insertUser(User user);
+
+    public List<User> listAll();
+
+    public int updateUser(User user);
+
+    public int deleteById(int id);
+}
+```
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="edu.seu.mapper.UserMapper">
+    <insert id="insertUser" parameterType="edu.seu.pojo.User">
+        insert into user(name,pwd) values (#{name},#{pwd})
+    </insert>
+
+    <select id="listAll" resultType="edu.seu.pojo.User">
+        select id,name,pwd from user
+    </select>
+
+    <update id="selectUser" parameterType="edu.seu.pojo.User">
+        update user set pwd=#{pwd} where id=#{id}
+    </update>
+
+    <delete id="deleteById" parameterType="int">
+        delete from user where id=#{id}
+    </delete>
+</mapper>
+```
+4.定义service。我们在applicationContext-trans.xml定义了事务的切点表达式为`execution(* edu.seu.service.*.*(..))`，并且通过tx:method标签约束了事务方法的命名规范。我们在service中编写具体的业务逻辑并调用UserMapper接口。而之前我们都是手动通过sqlSession.getMapper(UserMapper.class)来获得接口代理对象。现在我们可以对UserMapper接口使用Spring的@Component注解来让Spring创建管理该对象，我们直接取用就可以了。
+```java
+package edu.seu.service;
+
+import edu.seu.mapper.UserMapper;
+import edu.seu.pojo.User;
+import org.springframework.beans.factory.annotation.Autowired;
+
+public class UserService {
+    @Autowired //依赖注入，使用自动装配获得接口代理对象
+    UserMapper userMapper;
+
+    public int insertUser(User user) {
+		//目前事务只执行了一条语句
+        return userMapper.insertUser(user);
+    }
+}
+```
+5.编写Controller并调用service。既然service要在Controller中使用，那我们自然也可以交给IOC容器管理，Spring专门提供了`@Service`注解。
+
+:::warning
+因为容器中只需要1个UserMapper的代理对象和UserService对象就可以了，所以使用注解`@Component`和`@Service`时不需要专门取名（byType方式装配），否则就需要取名，靠byName方式装配。
+:::
+
+```java
+package edu.seu.controller;
+
+import edu.seu.pojo.User;
+import edu.seu.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.ModelAndView;
+
+@Controller
+@RequestMapping("/user")
+public class UserController {
+    @Autowired
+    UserService userService;
+
+    @RequestMapping("/add")
+    public ModelAndView add(User user) {
+        ModelAndView mv = new ModelAndView();
+        int n = userService.insertUser(user);
+        if (n > 0) {
+            mv.addObject("user", user);
+            mv.setViewName("user_show");
+        } else {
+            mv.setViewName("error");
+        }
+        return mv;
+    }
+}
+```
+
 ***
 **未完待续**			
