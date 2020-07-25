@@ -1097,3 +1097,33 @@ Spring MVC总体流程：
 1->2：数据绑定：Method通过数据绑定很方便地取出数据，处理后通过mv.addObject()封装进ModelAndView中（request）再转发给JSP。
 2->3：EL+JSTL：在JSP中使用这两项技术便捷地取出容器中的数据，将最终的html通过response返回给客户端。
 ```
+### 一次请求的生命周期：
+首先，浏览器会发送请求，我们的项目通过spring中的一个叫做dispatcherServlet名字的一个servlet来接收请求.
+
+这个Servlet接收请求后 会验证是否是第一次加载这个Servlet。如果是第一次加载这个Servlet 则此时dispatcherServlet会做一些初始化操作。
+
+1. dispatcherServlet会初始化HandlerMapping（注：通过它来处理客户端请求到各个Controller处理器的映射）
+
+2. dispatcherServlet会初始化HandlerAdapter（注：HandlerMapping会根据它来调用Controller里需要被执行的方法）
+
+3. dispatcherServlet会初始化handlerExceptionResolver（注：spring mvc处理流程中，如果有异常抛出，会交给它来进行异常处理）
+
+4. dispatcherServlet会初始化ViewResolver （注：HandlerAdapter会把Controller中调用返回值最终包装成ModelAndView,ViewResolver会检查其中的view，如果view是一个字符串，它就负责处理这个字符串并返回一个真正的View，如果view是一个真正的View则不会交给它处理）
+
+上述这些都初始化完毕后  然后dispathcerServlet会开始查询一个或者多个handlerMapping 来将请求映射到一个控制器对象
+
+* 如果此时没有找到一个控制器对象 则会抛出异常 
+
+* 如果找到了一个控制器对象 那么这个请求会经过一个拦截器链的preHandle处理 通过handlerAdapter来匹配到控制器对象的具体方法
+
+然后这个方法中会根据我们的业务逻辑来处理请求 完成业务逻辑的处理后 控制器会得到一个ModelAndView对象（注：这个类中的view这个属性是 Object 类型的，它可以是一个视图名也可以是一个实际的View）
+
+得到这个ModelAndView后   spring会判断ModelAndView的viewName是否是String类型 
+
+* 如果是String类型    则直接调用ModelAndView的getView方法   然后找到对应的页面 然后将信息返回给DispatcherServlet
+
+* 如果不是string类型 然后会根据viewName到ViewResolver中去找到这个名称  然后确定其对应的页面  然后将页面返回给dispatcherserlvet
+
+最后dispatcherSerlvet会将得到页面返回给浏览器。
+
+![DrYh2.jpg](https://wx1.sbimg.cn/2020/07/24/DrYh2.jpg)

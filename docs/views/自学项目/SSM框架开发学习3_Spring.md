@@ -83,6 +83,8 @@ IOC容器初始化时会有以下操作
 3. 将初始化完毕的对象放在容器中Bean缓存中管理。
 当有一个应用请求获取Bean时，就从容器中取出Bean以供使用
 
+![DrafJ.png](https://wx2.sbimg.cn/2020/07/24/DrafJ.png)
+
 ### Spring Bean作用域：scope
 Bean的作用域默认为singleton，共有以下几种：
 |作用域|说明|

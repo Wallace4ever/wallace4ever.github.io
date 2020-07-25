@@ -1,5 +1,5 @@
 ---
-title: SSM框架开发学习笔记-SSM整合实战
+title: SSM框架开发学习笔记-SSM整合
 date: 2020-07-21
 tags:
  - SSM
@@ -270,10 +270,11 @@ categories:
             * 扫描了Controller
             * 注册视图解析器bean
 
-## 练手：单表的增删改查
+## SSM整合练习
 前面说完了项目的资源文件（resources）配置，下面来看一下前端视图（webapp）和Java源文件的架构。
 
-1.首先，我们依然是在webapp/views目录下使用jsp模板，简要设计好与POJO对应的form与table。在Java目录下以用户管理这一应用场景为背景创建controller，由于是SSM整合，所以这次Java源文件目录下更细致地划分了包：
+### 项目组织架构
+首先，我们依然是在webapp/views目录下使用jsp模板，简要设计好与POJO对应的form与table。在Java目录下以用户管理这一应用场景为背景创建controller，由于是SSM整合，所以这次Java源文件目录下更细致地划分了包：
 * controller包：C层，控制请求的处理与前后端的数据交互。
 * service包：M层（业务逻辑），负责一次完整的数据库操作请求，接收事务的管理，可执行一组sql。
 * pojo包：M层（数据承载），封装表中的数据
@@ -281,7 +282,8 @@ categories:
 
 V层对应的是jsp前端视图，在MVC模型之外有时称DB为实体层。
 
-2.接下来，创建POJO类封装相应的属性，不过这次我们需要使用Spring注解`@Component`来将其交给IOC容器管理。
+### 使用Spring容器管理POJO
+接下来，创建POJO类封装相应的属性，不过这次我们需要使用Spring注解`@Component`来将其交给IOC容器管理。
 :::details
 ```java
 package edu.seu.pojo;
@@ -308,20 +310,25 @@ public class User {
 ```
 :::
 
-3.定义mapper（pojomapper.xml、PojoMapper.java接口）pojomapper.xml中的mapper标签的namespace属性必须要和接口的全限定名相同，sql语句的id要和方法名相同并且参数和返回值对应。
+### 使用Spring容器管理Mapper
+定义mapper（pojomapper.xml、PojoMapper.java接口）pojomapper.xml中的mapper标签的namespace属性必须要和接口的全限定名相同，sql语句的id要和方法名相同并且参数和返回值对应。
 ```java
 package edu.seu.mapper;
 
 import edu.seu.pojo.User;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+@Component
 public interface UserMapper {
     public int insertUser(User user);
 
     public List<User> listAll();
 
     public int updateUser(User user);
+
+    public User getUser(int id);
 
     public int deleteById(int id);
 }
@@ -340,34 +347,61 @@ public interface UserMapper {
         select id,name,pwd from user
     </select>
 
-    <update id="selectUser" parameterType="edu.seu.pojo.User">
-        update user set pwd=#{pwd} where id=#{id}
+    <update id="updateUser" parameterType="edu.seu.pojo.User">
+        update user set pwd=#{pwd},name=#{name} where id=#{id}
     </update>
 
     <delete id="deleteById" parameterType="int">
         delete from user where id=#{id}
     </delete>
+
+    <select id="getUser" parameterType="int" resultType="edu.seu.pojo.User">
+        select id,name,pwd from user where id=#{id}
+    </select>
 </mapper>
 ```
-4.定义service。我们在applicationContext-trans.xml定义了事务的切点表达式为`execution(* edu.seu.service.*.*(..))`，并且通过tx:method标签约束了事务方法的命名规范。我们在service中编写具体的业务逻辑并调用UserMapper接口。而之前我们都是手动通过sqlSession.getMapper(UserMapper.class)来获得接口代理对象。现在我们可以对UserMapper接口使用Spring的@Component注解来让Spring创建管理该对象，我们直接取用就可以了。
+
+### 使用Spring容器管理Service
+定义service。我们在applicationContext-trans.xml定义了事务的切点表达式为`execution(* edu.seu.service.*.*(..))`，并且通过tx:method标签约束了事务方法的命名规范。我们在service中编写具体的业务逻辑并调用UserMapper接口。而之前我们都是手动通过sqlSession.getMapper(UserMapper.class)来获得接口代理对象。现在我们可以对UserMapper接口使用Spring的@Component注解来让Spring创建管理该对象，我们直接取用就可以了。
 ```java
 package edu.seu.service;
 
 import edu.seu.mapper.UserMapper;
 import edu.seu.pojo.User;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
+import java.util.List;
+
+@Service
 public class UserService {
     @Autowired //依赖注入，使用自动装配获得接口代理对象
     UserMapper userMapper;
 
     public int insertUser(User user) {
-		//目前事务只执行了一条语句
+        //目前事务只执行了一条语句
         return userMapper.insertUser(user);
     }
+
+    public List<User> getAllUsers() {
+        return userMapper.listAll();
+    }
+
+    public int deleteUser(int id) {
+        return userMapper.deleteById(id);
+    }
+
+    public User updateUser(User user) {
+        userMapper.updateUser(user);
+        User u = userMapper.getUser(user.getId());
+        return u;
+    }
 }
+
 ```
-5.编写Controller并调用service。既然service要在Controller中使用，那我们自然也可以交给IOC容器管理，Spring专门提供了`@Service`注解。
+
+### 在Controller中调用Service
+编写Controller并调用service。既然service要在Controller中使用，那我们自然也可以交给IOC容器管理，Spring专门提供了`@Service`注解。
 
 :::warning
 因为容器中只需要1个UserMapper的代理对象和UserService对象就可以了，所以使用注解`@Component`和`@Service`时不需要专门取名（byType方式装配），否则就需要取名，靠byName方式装配。
@@ -382,6 +416,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
+
+import java.util.List;
 
 @Controller
 @RequestMapping("/user")
@@ -401,8 +437,44 @@ public class UserController {
         }
         return mv;
     }
+
+    @RequestMapping("/list")
+    public ModelAndView list() {
+        ModelAndView mv = new ModelAndView();
+        List<User> users = userService.getAllUsers();
+        mv.addObject("users", users);
+        mv.setViewName("user_list");
+        return mv;
+    }
+
+    @RequestMapping("/delete")
+    public ModelAndView delete(int id) {
+        ModelAndView mv = new ModelAndView();
+        int n = userService.deleteUser(id);
+        if (n > 0) {
+            mv.addObject("msg", "Delete success!");
+            mv.setViewName("message");
+        } else {
+            mv.addObject("error","Delete failed!");
+            mv.setViewName("error");
+        }
+        return mv;
+    }
+
+    @RequestMapping("update")
+    public ModelAndView update(User user) {
+        ModelAndView mv = new ModelAndView();
+        User u = userService.updateUser(user);
+        mv.addObject("user", u);
+        mv.setViewName("user_show");
+        return mv;
+    }
 }
+
 ```
 
-***
-**未完待续**			
+## 整合总结
+在项目中我们首先需要进行需求分析；接下来做一些准备工作包括ER图、数据字典设计，建表，选择一套前端模板；然后编写POJO，不单单是对表的封装，还要体现类和类之间的耦合关系；同时需要设计前端页面（一般由前端工程师完成）我们就简单根据需要调整jsp页面模板；编写Controller
+、service与mapper以应对要处理的前端请求。
+
+使用Spring来整合Spring MVC 、MyBatis让我们不需要再手动创建和管理对象（数据库连接、Mapper、Service等等），大大提升了开发效率。
