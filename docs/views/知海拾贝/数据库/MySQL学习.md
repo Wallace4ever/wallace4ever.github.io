@@ -1,5 +1,5 @@
 ---
-title: MySQL学习
+title: 数据库知识学习巩固
 date: 2020-07-24
 tags:
  - 数据库
@@ -97,3 +97,98 @@ update 表名 set 列名1=列值1,列名2=列值2 where 列名=值
 可以使用`delete from student where id=1;`如果不指定where条件，就会删除全部内容。
 
 使用`truncate table 表名`会直接删除表中全部内容。两者的区别是delete仅仅是删除表中数据，表结构还在，而truncate是吧表直接drop掉再创建一个同样的新表，执行速度比delete快。（结合自增auto_increment的表使用delete删除后不会从1开始来理解其用途）
+
+## DQL
+简单的指定的列的查询语句很简单：
+`select stu_name,stu_age from student;`，执行该查询会得到一个虚拟结果集，它存储在内存中，并不是一个真实的表。
+
+### 条件查询
+进一步还可以使用where子句来对查询的条件作出限定，常用的运算符有：=(等于)、!=(不等于)、<>(不等于)、<(小于)、<=(小于等于)、>(大于)、>=(大于等于)；between ... and；in(set)；is null、is not null；and与 or或 not非。
+
+选择性别为男且年龄为10的记录：
+```sql
+SELECT
+	* 
+FROM
+	student 
+WHERE
+	stu_gender = '男' 
+	AND stu_age = 10;
+```
+
+查询学号为1、3、5的学生记录：
+```sql
+SELECT
+	* 
+FROM
+	student 
+WHERE
+	id IN ( 3, 5, 7 );
+    # id=3 OR id=5 OR id=7; 这两句是等价的
+```
+
+查询年龄为null的记录
+```sql
+SELECT
+    *
+FROM
+    student
+WHERE
+    stu_age IS NULL;
+```
+
+查询年龄在18~20之间的学生记录
+```sql
+SELECT
+	* 
+FROM
+	student 
+WHERE
+	stu_age BETWEEN 10 AND 20;
+    # stu_age>=18 AND stu_age<=20 等价
+```
+
+### 模糊查询
+模糊查询也是一种条件查询，根据指定的关键字进行查询，使用LIKE关键字后跟通配符，通配符`_`表示任意一个字符，`%`表示任意多0~n个字符。
+
+查询名字有五个字母组成并且最后一个字符为'y'的学生：
+```sql
+SELECT
+	* 
+FROM
+	student 
+WHERE
+	stu_name LIKE '____y';
+    # stu_name LIKE '李%' 姓李的学生
+```
+
+查询名字包含'天'的学生：
+```sql
+SELECT
+	* 
+FROM
+	student 
+WHERE
+	stu_name LIKE '%天%';
+```
+
+### 字段控制
+使用DISTINCT关键字可以对结果进行去重操作。还可以对查询结果进行运算。
+
+查询学生年龄与成绩的和并起别名为total：
+```sql
+SELECT
+	stu_age + stu_score total 
+FROM
+	student;
+```
+如果要对选择字段可能出现的空值作默认值处理的话可以使用IFNULL(属性名,默认值)函数：
+```sql
+SELECT
+	IFNULL(stu_age,0) + IFNULL(stu_score,0) AS total # AS可以省略
+FROM
+	student;
+```
+
+***
+**未完待续**
