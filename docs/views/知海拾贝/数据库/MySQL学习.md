@@ -190,5 +190,82 @@ FROM
 	student;
 ```
 
+### 查询结果排序
+要对查询结果进行排序，可以使用ORDER BY子句。
+
+查询所有学生的信息并按照年龄降序排序
+```sql
+SELECT
+	* 
+FROM
+	student 
+ORDER BY
+	stu_age DESC; # 不写DESC默认为ASC
+```
+
+在上一条的基础上，如果年龄相同则按照成绩降序排序：
+```sql
+SELECT
+	* 
+FROM
+	student 
+ORDER BY
+	stu_age DESC,
+	stu_score DESC;
+```
+
+### 聚合函数
+SQL中常用的聚合函数有：
+* COUNT(): 统计指定列**不为NULL**的记录行数;
+* MAX(): 计算指定列的最大值，如果指定列是字符串类型，那么使用字符串排序运算;
+* MIN(): 计算指定列的最小值，如果指定列是字符串类型，那么使用字符串排序运算;
+* SUM(): 计算指定列的数值和，如果指定列类型不是数值类型，那么计算结果为0;
+* AVG(): 计算指定列的平均值，如果指定列类型不是数值类型，那么计算结果为0;
+
+查询有成绩的学生数：
+```sql
+SELECT
+	COUNT(stu_score)
+FROM
+	student;
+```
+查询成绩大于80分的学生人数：
+```sql
+SELECT
+	COUNT(*) 
+FROM
+	student 
+WHERE
+	stu_score > 80;
+```
+查询姓名不为空的学生人数和性别不为空的学生人数（这两个计数可能不同）：
+```sql
+SELECT 
+	COUNT(stu_name),
+	COUNT(stu_gender)
+FROM
+	students;
+```
+
+查询所有学生的年龄之和和成绩之和：
+```sql
+SELECT
+	SUM( stu_age ),
+	SUM( stu_score ) 
+FROM
+	student;
+```
+
+查询学生成绩的平均值、最高值、最低值：
+```sql
+SELECT
+	MAX( stu_score ),
+	MIN( stu_score ),
+	AVG( stu_score ) 
+FROM
+	student;
+```
+
+
 ***
 **未完待续**
