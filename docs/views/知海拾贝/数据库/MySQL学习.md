@@ -266,6 +266,82 @@ FROM
 	student;
 ```
 
+### 分组查询
+使用GROUP BY子句实现分组查询，单独使用时只显示每组的第一条记录，所以group by后面直接跟的字段一般都会出现在select之后。
 
+按照性别进行分组，查询每种性别的学生的姓名与学生的总成绩：
+```sql
+SELECT
+	stu_gender 性别,
+	GROUP_CONCAT( stu_name ) 姓名, # 每一组某字段的集合
+	SUM(stu_score) 总分 # 每一组某字段的总合
+	# MAX MIN AVG 等聚合函数都支持
+FROM
+	student 
+GROUP BY
+	stu_gender;
+```
+
+查询每种性别的学生分数高于60分的人数：
+```sql
+SELECT
+	stu_gender 性别,
+	COUNT(stu_score) 人数
+FROM
+	student 
+WHERE
+	stu_score > 80 
+GROUP BY
+	stu_gender;
+```
+
+此外，使用HAVING在分组查询后指定条件来输出结果（只能用在group by之后）
+
+查询分数总和大于200分的性别组：
+```sql
+SELECT
+	stu_gender 
+FROM
+	student 
+GROUP BY
+	stu_gender 
+HAVING
+	SUM( stu_score )> 200;
+```
+既然having 和where都是指定条件，那么他们的区别在哪里呢？having是在分组后对数据进行过滤，可以使用聚合函数；而where是在分组前对数据进行过滤，不可以后接聚合函数，如果某行记录不满足where子句的条件，那么它不会参加分组。
+
+选择及格人数超过30人的班级名称和及格人数并按人数降序排列：
+```sql
+SELECT
+	stu_class,
+	COUNT(*)
+FROM
+	student
+WHERE
+	stu_score>=60
+GROUP BY
+	stu_class
+HAVING
+	COUNT(*) >30
+ORDER BY 
+	COUNT(*) DESC;
+```
+
+### 书写顺序与执行顺序
+SQL语句的书写顺序为：select->from->where->group by->having->order by->limit
+
+实际执行顺序为：from->where->group by->having->select->order by->limit
+
+### 分页查询
+使用LIMIT来控制分页查询，第一页从1开始，而实际数据库中从0开始。记每页要查询的记录数为pageSize，当前在第curPage页，则应写为：`LIMIT (curPage-1)*pageSize,pageSize`。
+
+每页三条记录，选择第二页：
+```sql
+SELECT
+	* 
+FROM
+	student 
+	LIMIT 3,3;
+```
 ***
 **未完待续**

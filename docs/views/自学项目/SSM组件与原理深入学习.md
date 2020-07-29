@@ -185,5 +185,57 @@ public class TaoBaoObserver implements Observer {
 ### 工厂模式和建造者模式
 Spring在创建Bean的时候大量用到了工厂模式和建造者模式，前者对调用者屏蔽了对象的创建过程，后者适合在创建比较复杂的对象时使用。
 
+## 认识MyBatis核心组件
+MyBatis封装了JDBC的操作，使得开发者能够能便捷高效地访问数据库，其主要地成功点在于：
+1. 不屏蔽SQL，使得开发者能更精确地优化查询。
+2. 提供了强大灵活地ORM映射机制，提供了动态SQL地功能，允许开发者根据不同条件组装SQL。
+3. 提供了接口代理地功能，只需要接口和XML就能创建映射器，使开发者聚焦于业务逻辑。
+
+MyBatis地核心组件一共有四个：SqlSessionFactoryBuilder（构造器）、SqlSessionFactory（工厂接口）、SqlSession（会话）、SQL Mapper（映射器）。一般情况下我们通过SqlSessionFactoryBuilder读取xml配置文件（也可以使用代码创建，不推荐）来创建SqlSessionFactory，SqlSessionFactory接口有两个实现类：DefaultSqlSessionFactory和SqlSessionManager，后者适用于多线程环境。进一步我们可以通过SqlSession.openSession()来获得SqlSession，使用SqlSession我们可以控制SQL语句的发送、事务的提交回滚等等。
+
+为了能够在SqlSession中发送SQL语句，我们需要实现配置好mapper。可以使用xml创建，也可以直接在接口的方法上注解。前者我们已经比较熟悉了，给出一个后者的简单例子：
+```java
+public interface UserMapper{
+    @Select("select id, name, age from user where id=#{id}")
+    public User selectOneUser(int id);
+}
+```
+如果同时使用XML和注解，那么XML方式将覆盖掉注解方式，由于现实场景中会遇到更为复杂的SQL，在注解中不利于维护和修改，加上XML可以相互引入，所以官方更推荐使用XML方式。
+
+我们如果使用SqlSession直接发送SQL，需要通过全限定名+id来定位mapper，而我们还可以通过sqlSession.getMapper(UserMapper.class)来得到Mapper。使用Mapper来发送SQL可以消除SqlSession带来的功能性代码，并且更能体现面向对象的逻辑。
+
+### 核心组件的生命周期
+生命周期就是一个对象应该存活的时间，使用完毕后应由JVM销毁以避免继续占用资源。
+
+SqlSessionFactoryBuilder：该对象应该只存在于创建SqlSessionFactory的方法中。
+
+SqlSessionFactory：可以被理解为一个数据库连接池，所以其生命周期存在于整个MyBatis应用之中。另外，我们希望其作为一个单例，在应用中被共享以避免在一个应用中出现多个数据库连接池。
+
+SqlSession：相当于一个数据库连接对象，它应当存活在一个业务请求当中，处理完请求后应该关闭这条连接，让它归还给SqlSessionFactory。
+
+Mapper：代表的是一个请求中的业务处理步骤，所以其生命周期应该小于SqlSession的生命周期。
+
+## MyBatis配置
+MyBatis的配置主要包括：
+```xml
+<configuration><!-- 配置 -->
+    <properties/><!-- 属性 -->
+    <settings/><!-- 设置 -->
+    <typeAliases/><!-- 类型别名 -->
+    <typeHandlers/><!-- 类型处理器 -->
+    <objectFactory/><!-- 对象工厂，不常用 -->
+    <plugins/><!-- 插件 -->
+    <environments><!-- 所有环境 -->
+        <environment><!-- 某一环境变量 -->
+            <transactionManager/><!-- 事务管理器 -->
+            <dataSource/><!-- 数据源 -->
+        </environment>
+    </environments>
+    <databaseIdProvider/><!-- 数据库厂商标识 -->
+    <mappers/><!-- 映射器 -->
+</configuration>
+```
+这些配置项的顺序不能颠倒，否则MyBatis启动阶段可能发生异常。
+
 ***
 **未完待续**
