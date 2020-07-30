@@ -343,5 +343,90 @@ FROM
 	student 
 	LIMIT 3,3;
 ```
+
+## 数据完整性
+### 实体完整性
+实体完整性是为了确保每一行的数据不能完全重复，主键必须是唯一的。实体完整性的约束类型有三种：主键约束（primary key）、唯一约束（unique）和自动增长约束（auto_increment)。
+
+主键数据唯一且不能为null，可以在创建表时在属性后面设置：
+```sql
+create table person(
+    -> id bigint primary key,
+    -> name varchar(50)
+    -> );
+```
+也可以定义完属性后在最后设置主键：
+```sql
+create table person(
+    -> id bigint,
+    -> name varchar(50),
+    -> age int,
+    -> primary key(id)
+    -> );
+```
+使用这种方式还可以创建联合主键，联合主键中所有字段同时相同时才违反主键约束
+```sql
+create table person(
+    -> id bigint,
+    -> name varchar(50),
+    -> age int,
+    -> primary key(id,name)
+    -> );
+```
+我们还可以在创建完表之后再为其添加主键（但一般在设计表的时候就确定了主键）：
+```sql
+alter table person add constraint primary key(id);
+```
+
+唯一约束不允许字段内出现重复的值，但可以为空。
+```sql
+create table person(
+    -> id bigint,
+    -> name varchar(50) unique
+    -> );
+```
+自动增长约束使用auto_increment，一般跟在数值型主键后。即使一条记录删除后，新的值依然从删除的序号开始继续往后增长。
+```sql
+create table person(
+    -> id bigint primary key auto_increment,
+    -> name varchar(50) unique
+    -> );
+```
+
+### 域完整性
+域完整性限制单元格内的数据的正确性，不与此列其它单元格作比较。主要包括数据类型约束（在定义表时就确定了）、非空约束（not null）和默认值约束（default）。
+
+```sql
+CREATE TABLE stu ( 
+	id INT PRIMARY KEY auto_increment, 
+	name VARCHAR ( 20 ) UNIQUE NOT NULL, 
+	gender CHAR ( 1 ) DEFAULT '男' 
+);
+```
+
+### 参照完整性
+参照完整性是指表与表之间的对应关系，通常情况下可以通过设置两表之间的主键、外键关系，或者编写两表的触发器来实现。有对应参照完整性的两张表格，在对他们进行数据插入、更新、删除的过程中，系统都会将被修改表格与另一张对应表格进行对照，从而阻止一些不正确的数据的操作。
+
+要建立参照完整性，主键类型和外键类型必须一致，所有表必须使用InnoDB引擎。假如我们有这样一张学生表：
+```sql
+CREATE TABLE stu (
+	id INT PRIMARY KEY,
+	name VARCHAR(50),
+	age INT
+);
+```
+那么建立成绩表时可以为其中的学生id设置外键，这里如果不为约束起名的话会自动生成一个名字：
+```sql
+CREATE TABLE score(
+	sid INT,
+	score INT,
+	CONSTRAINT sc_st FOREIGN KEY(sid) REFERENCES stu(id)
+);
+```
+此外在表建立完成后也可以为其添加外键约束：
+```sql
+ALTER TABLE score
+add CONSTRAINT sc_st FOREIGN KEY(sid)REFERENCES stu(id);
+```
 ***
 **未完待续**
