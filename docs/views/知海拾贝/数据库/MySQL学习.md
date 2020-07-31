@@ -407,6 +407,10 @@ CREATE TABLE stu (
 ### 参照完整性
 参照完整性是指表与表之间的对应关系，通常情况下可以通过设置两表之间的主键、外键关系，或者编写两表的触发器来实现。有对应参照完整性的两张表格，在对他们进行数据插入、更新、删除的过程中，系统都会将被修改表格与另一张对应表格进行对照，从而阻止一些不正确的数据的操作。
 
+:::warning
+保证参照完整性需要使用外键，不过阿里巴巴开发手册中禁止使用外键，所有的参照关系一律在应用层解决，因为使用外键时可能发生级联更新，不适合分布式、高并发集群；级联更新是强阻塞，存在数据库更新风暴的风险；外键影响数据库的插入速度。
+:::
+
 要建立参照完整性，主键类型和外键类型必须一致，所有表必须使用InnoDB引擎。假如我们有这样一张学生表：
 ```sql
 CREATE TABLE stu (
@@ -428,5 +432,223 @@ CREATE TABLE score(
 ALTER TABLE score
 add CONSTRAINT sc_st FOREIGN KEY(sid)REFERENCES stu(id);
 ```
+
+## 多表查询
+表的数据之间有很多种关系，有一对一的关系（例如一夫一妻），一对多的关系以及多对多的关系，我们主要来看后两者，它们通过拆分为多个表避免大量冗余数据的出现。
+
+一对多关系：例如一个人可以拥有多辆车，而一辆车只能有一个主人。这时在多的一方添加外键即可。
+```sql
+CREATE TABLE person(
+	id INT PRIMARY KEY auto_increment,
+	name VARCHAR(20) NOT NULL
+);
+
+CREATE TABLE car(
+	id INT PRIMARY KEY,
+	type VARCHAR(20) NOT NULL,
+	pid INT,
+	CONSTRAINT p_c_fk FOREIGN KEY(pid) REFERENCES person(id)
+);
+```
+多对多关系：例如一个学生可以有多个老师，一个老师可以有多个学生，那么这时需要一张额外的中间表tea_stu_rel，其中记录了每一对师生的id组合并分别设置外键。
+```sql
+CREATE table tea_stu_rel(
+	tid INT,
+	sid INT,
+	CONSTRAINT fk_tid FOREIGN KEY(tid) REFERENCES teacher(id),
+	CONSTRAINT fk_sid FOREIGN KEY(sid) REFERENCES student(id)
+);
+```
+
+### 合并结果集
+合并结果集就是把两个select语句的查询结果合并到一起，可以使用UNION（合并时去除重复记录）和UNION ALL（不去除重复记录），这里两个查询结果的列数和列的类型必须相同。
+```sql
+SELECT * FROM a
+UNION # 或者UNION ALL
+SELECT * FROM b;
+```
+
+### 连接查询
+我们使用一个语句去查询多张表时就是从这些表的笛卡尔积中进行选择，如果不加where条件限制则结果为整个笛卡尔积，这样很可能是没有意义的，所以一般在查询时要保持主键和外键的一致（不一定要设置外键关系，逻辑上存在关联就可以了）。
+```sql
+# 这种查询方式称为99查询法
+SELECT
+	p.id 车主编号,
+	p.name 车主姓名,
+	c.id 车辆编号,
+	c.type 车辆类型 
+FROM
+	person p,
+	car c 
+WHERE
+	c.pid = p.id;
+```
+根据连接查询的连接方式我们可以将其分为以下几类：
+* 内连接INNER JOIN （INNER可省略）
+	* 等值连接：和上面的多表查询约束主外键一样，只是写法变了。例如`SELECT * FROM stu INNER JOIN score ON stu.id = score.sid;`，如果有更多条件可以继续使用WHERE子句。
+	* 非等值连接：ON后面跟的条件不是相等。
+	* 多表连接：使用99连接法或内联查询，例如要从学生表、课程表和成绩表中选出学生姓名、课程名称和成绩
+		```sql
+		# 99连接法
+		SELECT stu.name,course.name,score.score
+		FROM stu,score,course
+		WHERE stu.id = score.sid AND score.cid = course.id;
+
+		# 多表内联查询
+		SELECT stu.name,course.name,score.score
+		FROM stu 
+		JOIN score ON stu.id = score.sid
+		JOIN course ON score.cid = c.id;
+		```
+	* 自连接：在查询一些表内一对一的关系时使用，为一张表起两个别名看作两张表。例如查询7369号员工的姓名、经理编号和经理姓名
+		```sql
+		SELECT e1.ename,e2.eno,e2.ename
+		FROM emp e1,emp e2
+		WHERE e1.empno=7369 AND e1.mgr=e2.empno;
+		```
+* 外连接
+	* 左外连接： LEFT OUTER JOIN（OUTER可省略） 左边表的数据全部查出来，右表中只把满足连接条件的数据查出来。`SELECT * FROM stu LEFT JOIN score ON stu.id = score.sid;`
+	* 右外连接：与左连接相反
+* 自然连接（NATURAL JOIN）：我们一般通过逻辑上的主外键来消除无用的笛卡尔积，而自然连接无需手动给出主外键等式，要求连接的表中列名称和类型完全一致的列作为连接条件，自然连接会去除相同的列。`SELECT * FROM stu NATURAL JOIN score;`如果有多个属性名和类型相同，则必须全部相同才会做自然连接。
+
+非等值连接准备数据：
+```sql
+# 雇员表
+CREATE TABLE `emp` (
+  `empno` int NOT NULL,
+  `ename` varchar(255) DEFAULT NULL,
+  `job` varchar(255) DEFAULT NULL,
+  `mgr` varchar(255) DEFAULT NULL,
+  `hiredate` date DEFAULT NULL,
+  `salary` decimal(10,0) DEFAULT NULL,
+  `comm` double DEFAULT NULL,
+  `deptno` int DEFAULT NULL,
+  PRIMARY KEY (`empno`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+# 部门表
+CREATE TABLE `dept` (
+  `deptno` bigint NOT NULL AUTO_INCREMENT COMMENT '表示部门门编号，由两位数字所组成',
+  `dname` varchar(14) DEFAULT NULL COMMENT '部门名称，最多由14个字符所组成',
+  `local` varchar(13) DEFAULT NULL COMMENT '部门J所在的位置',
+  PRIMARY KEY (`deptno`)
+) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8;
+
+# 工资等级表
+CREATE TABLE `salgrade` (
+  `grade` bigint NOT NULL AUTO_INCREMENT COMMENT '工资等级',
+  `low_salary` int DEFAULT NULL COMMENT ' 此等级的最低工资',
+  `high_salary` int DEFAULT NULL COMMENT '此等级的最高工资',
+  PRIMARY KEY (`grade`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8;
+```
+查询所有员工的姓名，工资，所在部门的名称以及工资的等级：
+```sql
+# 99连接法
+SELECT emp.ename,emp.salary,dept.dname,salgrade.grade
+FROM emp,dept,salgrade
+WHERE emp.deptno=dept.deptno
+# AND emp.salary >= salgrade.low_salary AND emp.salary <= salgrade.high_salary
+AND emp.salary BETWEEN salgrade.low_salary AND salgrade.high_salary
+;
+
+SELECT e.ename,e.salary,d.dname,g.grade
+FROM emp e 
+JOIN dept d ON e.deptno=d.deptno
+JOIN salgrade g ON e.salary BETWEEN g.low_salary AND g.high_salary;
+```
+
+## 子查询
+一个select语句中包含了另一个（或多个）完整的select语句就是一个子查询。子查询可以出现在两个位置：
+1. WHERE之后，把select查询出的结果当作另一个select的条件值
+2. FROM之后，把查询出的结果当作一个新表。
+
+查询与张三同一个部门的员工的姓名与工号：
+```sql
+SELECT ename,empno
+FROM emp
+WHERE deptno=(SELECT deptno FROM emp WHERE ename='张三');
+```
+查询30号部门中薪资高于2000的雇员名:
+```sql
+# 这个例子有点强行使用了
+SELECT ename, salary FROM
+(SELECT ename, salary, deptno FROM emp WHERE deptno = 30) s
+WHERE s.salary > 2000;
+```
+更多练习：
+
+查询工资高于30号部门所有人的员工信息：
+```sql
+SELECT ename,salary
+FROM emp
+WHERE salary > (SELECT MAX(salary) FROM emp WHERE deptno=30);
+```
+查询工作和工资与张三完全相同的员工信息：
+```sql
+# 将子查询当作条件
+SELECT ename,empno
+FROM emp
+WHERE (job,salary) IN (SELECT job,salary FROM emp WHERE ename='张三');
+
+# 将子查询当作表作自然连接
+SELECT e.ename, e.empno
+FROM emp e
+NATURAL JOIN (SELECT job,salary FROM emp WHERE ename='张三') result;
+
+SELECT e.ename, e.empno
+FROM emp e, (SELECT job,salary FROM emp WHERE ename='张三') result
+WHERE e.job=result.job AND e.salary=result.salary;
+```
+查询有两个以上直接下属的员工信息：
+```sql
+SELECT * FROM emp
+WHERE empno IN (SELECT mgr from emp GROUP BY mgr HAVING COUNT(mgr) >= 2);
+```
+
+## 常用函数
+函数一般不涉及面向对象，方法一般和面向对象有关系。数据库中提供了一些写好的功能可以直接使用，函数可以用在SELECT语句及其子句、UPDATE、DELETE当中。
+
+### 字符串函数
+1. CONCAT(s1,s2,...sn)：将传入的字符串连接成一个字符串，任何字符串与null连接结果都是null。
+2. INSERT(str,x,y,instr)：从str的第x位置（1，2，...，x包括x）开始，长度为y的子串替换为指定字符instr
+3. LOWER(str)和UPPER(str)：将字符串转为小写和大写。
+4. LEFT(str,x)和RIGHT(str,x)：分别返回字符串最左边的x个字符和最右边的x个字符。如果x为null则不返回任何字符。
+5. LPAD(str,n,pad)和RPAD(str,n,pad)：用字符串pad对str最左边或最右边进行填充，直到长度为n个字符长度。例如LPAD('my',5,123456)的结果为'123my'，长度达到5后就停止。
+6. LTRIM(str)、RTRIM(str)和TRIM(str)分别从左侧、右侧、左右两侧清除空格。
+7. REPEAT(str,x)：返回str重复x次的结果。
+8. REPLACE(str,a,b)：把str中所有的a用b代替。
+9. SUBSTRING(str,x,y)：返回str中第x位置起长度为y的字符。
+
+### 数值函数
+1. ABS(x)：求绝对值
+2. CEIL(x)和FLOOR(x)：向上取整和向下取整
+3. MOD(x,y)：返回x mod y
+4. RAND()：生成0~1之间的随机小数。如果要生成1~10内的随机整数可以CEIL(RAND()*10)
+
+### 日期和时间函数
+1. CURDATE()：返回当前日期，只包含年月日
+2. CURTIME()：返回当前日期，只包含时分秒
+3. NOW()：当前的年月日时分秒
+4. UNIX_TIMESTAMP() 返回当前日期的时间戳，1970年至今的毫秒数
+5. FROM UNIXTIME(unixtime) 将一个时间戳转换成日期
+6. WEEK(DATE) 返回当前是一年中的第几周
+7. YEAR(DATE) 返回所给日期是那一年
+8. HOUR(TIME) 返回当前时间的小时
+9. MINUTE(TIME) 返回当前时间的分钟
+10. DATEFORMAT(DATE,fmt)：按照字符串格式化日期DATE的值。例如`DATEFORMAT(NOW(),'%M,%D,%Y');`
+11. DATE_ADD(date,INTERVAL expr type)：计算日期间隔。例如`DATE_ADD(date,INTERVAL 31 DAY);`，单位可以是天、周或年。
+12. DATE_DIFF(date1,date2)：计算两个日期相差的天数。
+
+### 流程函数和系统相关函数
+1. IF(value,t,f)：如果value为真返回t否则返回f。例如：`SELECT IF( (SELECT salary FROM emp WHERE ename = '李白')>5000, '经理','员工')`。
+2. IFNULL(value1,value2)：如果value1不为空则返回value1，否则返回value2.
+3. CASE WHEN 2>3 THEN '对' ELSE '错' END：一般要用到复杂的流程控制就在应用层进行处理了。
+4. DATABASE()：返回当前数据库名
+5. VERSION()：返回当前数据库版本
+6. USER()：当前登录用户名
+7. PASSWORD(str)：对str进行加密
+8. MD5(str)：返回字符串的md5值
+
 ***
 **未完待续**
