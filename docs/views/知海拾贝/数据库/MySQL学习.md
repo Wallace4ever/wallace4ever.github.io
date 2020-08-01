@@ -650,5 +650,293 @@ WHERE empno IN (SELECT mgr from emp GROUP BY mgr HAVING COUNT(mgr) >= 2);
 7. PASSWORD(str)：对str进行加密
 8. MD5(str)：返回字符串的md5值
 
-***
-**未完待续**
+## 事务
+事务是一组不可分割的操作，只对DML语句有效。事务的有四个特性：
+* 原子性（Atomicity）：事务包含的操作要么全部成功，要么全部失败回滚。
+* 一致性（Consistency）：事务必须使数据库从一个一致性状态变换到另一个一致性状态。
+* 隔离性（Isolation）：事务操作的中间状态对其它事务不可见。
+* 持久性（Durability）：事务对数据库的改动影响是永久的。
+
+默认一条DML语句为一个事务，如果需要将多组DML作为一个事务，需要用`START TRANSACTION;`手动开启事务。
+
+下面以两个账户转账为例：
+```sql
+# 建立张三和李四的账户并分别存入5000元和1000元
+CREATE TABLE bank_account(
+	name VARCHAR(30),
+	money DECIMAL
+);
+```
+下面开启事务、提交事务：
+```sql
+START TRANSACTION;
+UPDATE bank_account SET money = money - 2000 WHERE name = '张三';
+UPDATE bank_account SET money = money + 2000 WHERE name = '李四';
+# 这时在外部执行SELECT语句张三和李四的账户仍然分别为5000元和1000元
+COMMIT; # 事务提交后
+```
+事务的回滚：在执行事务时由于某些特殊情况需要回滚事务则使用`ROLLBACK;`，事务结束时要么回滚要么提交。
+
+### 事务的并发问题
+* 脏读：事务A读取事务B修改过的数据后，事务B进行了回滚操作，这时A读取到的数据就是脏数据。
+* 不可重复读：一次事务范围内两个相同的查询返回了不同的数据。
+* 幻读：一次事务范围内的两个相同的查询发现新增或减少了记录。
+
+### 事务的隔离级别
+MySQL8可以通过`select @@global.transaction_isolation,@@transaction_isolation;`命令来查看当前的全局隔离级别（5.x是tx_isolation）。隔离级别有以下四种：
+
+* read uncommitted 读未提交，一个事务可以读取另一个事务未提交的数据。最低的隔离级别，可能导致脏读、不可重复读、幻读。
+* read committed 读已提交，一个事务只能读取另一个事务提交的数据。能解决脏读的问题，但可能出现不可重复读和幻读。
+* repeatable read 可重复读，事务开启后不允许其它事务的UPDATE操作。MySQL的默认开发级别，不能避免幻读。
+* serializable 串行化，能避免幻读，但效率低下一般不使用。
+
+可以通过隔离级别命令来修改（一般不需要我们修改）：
+```sql
+SET GLOBAL TRANSACTION ISOLATION LEVEL READ COMMITTED;
+SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+```
+
+## DCL
+权限管理：限制一个用户能够做什么事情，在MySQL中，可以设置全局权限，指定数据库权限，指定表权限，指定字段权限。可以分配的权限有：
+
+|权限|说明|
+|--|--|
+|CREATE|创建数据库、表或索引权限|
+|DROP |除数据库或表权限|
+|ALTER |更改表，比如添加字段、索引等|
+|DELETE|删除数据权限|
+|INDEX |索引权限|
+|INSERT |插入权限|
+|SELECT |查询权限|
+|UPDATE |更新权限|
+|CREATE VIEW |创建视图权限|
+|EXECUTE|执行存储过程权限|
+
+创建用户和删除用户：
+```sql
+create user '用户名'@'localhost' identified by '密码';
+drop user '用户名'@'localhost';
+```
+分配权限：
+```sql
+GRANT 权限(columns) ON 数据库名.表名 TO 用户 IDENTIFIED BY '密码' WItH GRANT OPTION;
+
+# 为用户tom赋予超级管理员权限，并能继续授予权限
+GRANT ALL PRIVILEGES ON *.* TO tom@localhost IDENTIFIED BY '1234' WItH GRANT OPTION;
+FLUSH PRIVILEGES;
+
+# 让用户tom只能对mydb数据库的stu表进行CRUD操作
+GRANT insert, update, select,delete on mydb.stu TO tom@localhost IDENTIFIED BY '1234';
+```
+查看权限：
+```sql
+SHOW GRANTS; # 查看当前用户的权限
+SHOW GRANSTS FOR tom@localhost; # 查看指定用户的权限
+```
+删除权限：
+```sql
+REVOKE 权限 ON 数据库名.表名 FROM 用户;
+```
+
+## 视图
+视图是一个虚拟的表，不存储具体的数据，其内容由查询定义，简单来说是由SELECT结果集组成的表，基本表发生改变视图也会跟着改变。可以进行增删改查操作（增删改有条件限制）。使用视图提高了安全性、查询性能和数据的独立性。创建好一个视图、定义好视图所操作的数据，之后就可以用GRANT语句将用户权限与视图绑定。
+
+### 创建、修改和删除视图
+为雇员表中的所有经理创建一个视图
+```sql
+CREATE VIEW emp_mgr_view
+AS (SELECT * FROM emp WHERE job = '经理');
+```
+创建时如果同名视图已经存在则替换之
+```sql
+CREATE OR REPLACE VIEW emp_mgr_view
+AS (SELECT * FROM emp WHERE job = '经理');
+```
+删除视图
+```sql
+DROP VIEW emp_mgr_view;
+```
+查询当前数据库中所有的视图
+```sql
+SHOW FULL TABLES IN mydb WHERE TABLE_TYPE LIKE 'VIEW';
+```
+
+### 视图的查询机制
+我们在前面的创建视图语句写得比较简单，完整的创建语句如下，其中方括号括起来的是可选项。
+```sql
+CREATE [ALGORITHM={UNDEFINED|MERGE|TEMPTABLE}]
+VIEW 视图名[(属性清单)]
+AS SELECT语句
+[WITH [CASCADED|LOCAL] CHECK OPTION];
+```
+MERGE的处理方式是替换式，在使用视图时相当于直接将视图名换成SELECT语句，可以更新真实表中的数据；TEMPTABLE是具化式，先得到视图执行的结果并形成一个中间表暂时存在内存中，不能进行更新操作；UNDEFINED没有定义ALGORITHM参数，mysql更倾向于选择替换式。
+
+WITH CHECK OPTION 限制插入或更新数据时不能违反视图的限制条件，例如上面定义视图时要求job为经理，那么就不可以插入或更新job不为经理的记录。
+
+### 视图不可更新的部分
+我们要记住一个原则，只要视图中的数据不是来自于基表，就不能直接修改。例如聚合函数、DISTINCT关键字、GROUP BY子句、HAVING子句、UNION运算符、FROM子句中包含多个表、SELECT语句中引用了不可更新的视图。
+
+## 存储过程
+:::warning
+阿里巴巴开发手册禁止使用存储过程，因为其难以调试和扩展，更没有移植性。MySQL的存储过程功能相对较弱。
+:::
+
+存储过程是一组可编程的函数，是为了完成特定功能的SQL语句集。创建的存储过程具有名字，保存在数据库的数据字典中。
+
+### 创建、使用和删除存储过程
+在创建存储过程之前使用delimeter来修改结束符，默认的delimeter是分号，在输入分号按下回车后MySql将执行该命令。我们输入delimeter $$按下回车，则只有当$$出现后mysql解释器才会执行这段语句。
+```sql
+delimiter $$
+CREATE PROCEDURE show_emp()
+BEGIN
+# 我们在创建存储过程时可能会用到多个SQL语句，所以需要暂时修改delimiter
+SELECT * FROM emp;
+END $$
+delimiter ;
+```
+之后就可以通过`CALL show_emp()`来调用这个存储过程。
+
+查看已有的存储过程：
+```sql
+# 查看所有的存储过程
+SHOW PROCEDURE STATUS;
+# 查看指定数据库的的存储过程
+SHOW PROCEDURE STATUS WHERE db = 'mydb';
+#查看指定存储过程源代码
+SHOW CREATE PROCEDURE 存储过程名;
+```
+删除存储过程直接使用`DROP PROCEDURE show_emp;`即可。
+
+### 存储过程内的变量
+变量只在存储过程内有效，在存储过程声明内部使用DECLARE来声明一个或多个变量：
+```sql
+DECLARE x,y INT DEFAULT 0;
+```
+可以使用SET来修改变量值：
+```sql
+SET x=1;
+```
+还可以把一个查询结果赋值给一个变量：
+```sql
+SELECT avg(salary) INTO x FROM emp;
+```
+
+### 存储过程的参数传递
+IN参数：创建一个可以传入参数的存储过程：
+```sql
+delimiter $$
+CREATE PROCEDURE getName(IN targetname VARCHAR(255))
+BEGIN
+SELECT * FROM emp WHERE ename=targetname;
+END $$
+delimiter ;
+```
+接下来就可以在调用时传入参数了：
+```sql
+CALL getName('张三');
+```
+
+OUT参数：创建一个可以传入参数和返回值的存储过程，根据名字返回工资：
+```sql
+delimiter $$
+CREATE PROCEDURE getSalary(IN targetname VARCHAR(255), OUT salary INT)
+BEGIN
+SELECT salary INTO salary FROM emp WHERE ename = targetname;
+END $$
+delimiter ;
+```
+调用时，传入参数和变量用于接收返回值：
+```sql
+# @表示这个变量可以用于地址传递
+CALL getSalary('张三',@s);
+# 这时@s这个变量就已经保存了返回值
+SELECT @s FROM DUAL; # FROM DUAL 是虚拟表，可省略
+```
+此外还有INOUT参数，既是输入也是输出。
+
+### 自定义函数
+随机生成长度为n的字符串：
+```sql
+set global log_bin_trust_function_creators=TRUE;
+
+delimiter $$
+CREATE FUNCTION rand_str(n INT) RETURNS VARCHAR(255)
+BEGIN
+# 声明一个str 52个字母
+DECLARE str VARCHAR(100) DEFAULT 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+# 记录当前是第几个
+DECLARE i INT DEFAULT 0;
+# 生成的结果
+DECLARE res_str VARCHAR(255) DEFAULT '';
+
+WHILE i < n DO
+	SET res_str = CONCAT(res_str,substr(str,CEIL(RAND()*52),1));
+	SET i = i + 1;
+END WHILE;
+
+RETURN res_str;
+END $$
+delimiter ;
+```
+使用该函数，创建存储过程，向表中插入一千万条数据：
+```sql
+CREATE TABLE emp(id INT, name VARCHAR(50), age INT);
+
+delimiter $$
+CREATE PROCEDURE insert_randemp(IN startNum INT, IN max_num INT)
+BEGIN
+DECLARE i INT DEFAULT 0;
+SET autocommit = 0;
+REPEAT
+	SET i = i+1;
+	INSERT INTO emp VALUES(startNum+i, rand_str(5),FLOOR(10+RAND()*30));
+UNTIL i=max_num
+END REPEAT;
+COMMIT;
+END $$
+delimiter ;
+
+CALL insert_randemp(100,10000000);
+```
+
+## 索引
+索引用于快速找出在某个列中有一特定值的行，不使用索引则必须要从第一条记录开始读完整个表直到找出相关的行。
+
+使用索引的优缺点：
+* 提高了检索效率，降低IO成本
+* 通过索引排序能降低CPU消耗
+* 索引实际上也是一张表，保存了主键与索引字段，并指向实体表的记录，也会占用一定空间
+* 索引会降低对表执行DML的速度
+
+### 索引的分类
+* 单值索引：一个索引只包含单个列，一个表可以有多个单值索引
+* 唯一索引：索引列的值必须唯一，但允许有空值
+* 复合索引：一个索引包含多个列
+* 全文索引：只在MyISAM引擎上才能使用，且只能对CHAR VARCHAR TEXT类型字段才能使用
+* 空间索引：只在MyISAM引擎上才能使用，对空间数据类型的字段建立的索引
+
+在表上定义主键时，会自动创建一个对应的唯一索引；在表上定义一个外键时，会自动创建一个普通的单值索引。
+
+创建索引：
+```sql
+CREATE INDEX 索引名 ON 表名(列名[,列名,...]);
+```
+删除索引：
+```sql
+DROP INDEX 索引名 ON 表名
+```
+查看表的索引
+```sql
+SHOW INDEX FROM 表名
+```
+可以通过explain加查询语句来分析该查询是否用到了索引。建索引时会先对数据进行排序。
+
+常见的索引结构有B+ Tree和Hash索引（InnoDB使用的BTree），B+树是一种平衡的多叉树，从根节点到每个叶子节点的高度差不超过1，叶子节点间有指针相互连接。
+
+哪些情况下需要/不宜创建索引：
+* 主键自动建立唯一索引，外键自动创建单值索引
+* 频繁作为查询条件的字段应该作为索引
+* 查询中排序的字段如果通过索引将大大提高排序速度
+* 表记录太少则不宜建索引
+* 经常增删改的表不宜建索引
+* 如果某个数据列包含许多重复的内容，则建立索引就没有太好的效果
