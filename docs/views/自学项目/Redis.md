@@ -42,7 +42,7 @@ Redis的应用场景
 ## Redis数据存储类型
 Redis自身是一个Map，其中所有的数据都是采用key:value的形式存储，key永远都是字符串，我们讨论的数据存储类型是value部分的类型。
 
-### String类型
+### string类型
 单个数据，最简单也是最常用的数据存储类型，一个存储空间保存了一个数据，如果字符串以整数的形式展示则可以作为数字操作使用。
 
 String类型的基本操作：
@@ -87,6 +87,14 @@ psetex key milliseconds value
 ```
 
 String类数据未获取到返回(nil)，数据最大存储量为512MB，一般不会也没有必要用到这么大的热点数据。
+
+**场景：** 应用于限时按次结算的服务控制
+一分钟内允许最多调用10次，超过10次则拒绝服务，每隔1分钟重置调用计数。
+```
+setex uid:0001 60 0 //设置该用户1min内已经调用次数为0
+get uid:0001 //用户发起调用时先检查次数，达到10则拒绝服务，如果为nil则再执行上一条语句
+incr uid:0001 //成功调用服务后计数+1
+```
 
 **场景：** Redis应用于各种结构型和非结构型高热度数据访问加速，例如为大V用户设定粉丝数、推文数等信息，这时可以这样存储并设定定时刷新策略：
 ```
@@ -174,3 +182,160 @@ list可能为空，这时在时间超限之前都会阻塞，一旦有别的客�
 lrem key count value //从左往右删掉count个值为value的数据（list中可能有相同数据）
 ```
 list保存数据是string类型的，单个list最多存2^32-1个元素。list具有索引概念，但一般以栈和队列的形式进行操作。队列模型可以解决多路信息汇总合并的问题，栈模型可以解决最新消息的问题。
+
+### set类型
+list底层采用双向链表，查询效率并不高，我们现在需要存储大量数据并在查询方面提供更高的效率。
+这时就有了set类型，set类型与hash存储结构完全相同，仅存储键不存储值（nil），并且不允许重复。
+
+set类型数据的基本操作：
+```
+# 添加数据
+sadd key member1 member2 ...
+# 获取全部数据
+smembers key
+#删除数据
+srem key member1 member2 ...
+# 获取集合数据总量
+scard key
+# 判断集合中是否包含指定数据
+sismember key member
+```
+set类型的扩展操作（可以用于随机推荐信息）：
+```
+# 随机获取集合中指定数量的数据
+srandmember key [account]
+# 随机获得并移除集合中的指定数量的数据
+spop key [account]
+```
+set类型的扩展操作（两个集合的交并差集）：
+
+可用于深度关联搜索，得到共同好友，独立访问量统计，黑白名单等等。
+```
+# 求两个集合的交、并、差集
+sinter keyl [key2] ...
+sunion keyl [key2] ...
+sdiff keyl [key2] ... //这里是前面集合减去后面的集合
+# 求两个集合的交、并、差集并存储到指定集合中
+sinterstore destination keyi[key2]
+sunionstore destination keyl [key2]
+sdiffstore destination keyl [ key2]
+# 将指定数据从原始集合中移动到目标集合中
+srmove source destination member
+```
+redis可以提供基础数据（smembers）也可以提供校验结果（sismember），但后者是把校验的业务逻辑放到存储这边来做了，有一定的耦合，不推荐。
+
+### sorted_set（zset）类型
+list能保存数据的插入顺序，但不能按照元素的自然顺序进行排序。我们需要保存可排序的数据，sorted_set应运而生。
+
+sorted_set在set存储结构的基础上添加了可排序的字段score，score字段不用来存储数据而仅用来排序。
+
+sorted_set类型数据的基本操作：
+```
+# 添加数据
+zadd key score1 member1 score2 member2 ...
+# 获取排序后指定序号范围数据
+zrange key start stop [withscores] //查看指定范围的数据（升序），如果加上withscores会连同分数一并显示
+zrevrange key start stop [withscores] //查看降序排序的数据
+# 删除数据
+zrem key member1 member2 ...
+
+# 按照score范围获取数据
+zrangebyscore key min max [withscores] [LIMIT offset count] //limit限制返回查询到的结果数量
+zrevrangebyscore key max min [withscores] [LIMIT offset count]
+
+# 按排序后的顺序删除数据
+zremrangebyrank key start stop
+# 按score删除顺序
+zremrangebyscore key min max
+
+# 获取集合数据量
+zcard key
+zcount key min max
+# 集合交并操作（合并时默认对相同的元素的score相加，可以用过AGGREGATE来控制使用最大值或最小值）
+zinterstore destination numkeys(要合并的集合数量) key1 key2 ...[AGGREGATE SUM|MIN|MAX]
+zunionstore destination numkeys key1 key2 ...
+```
+sorted_set类型数据的扩展操作：
+```
+# 获取数据对应的索引（排名）
+zrank key member //从小到大排第几，得到0表示最小，第1小
+zrevrank key member //从大到小排第几，得到0表示最大，第1大
+
+# score值获取与修改
+zscore key member
+zincrby key increment member
+```
+score保存的数据存储空间为64位，可以为整数也可以为双精度double值，但double值可能丢失精度导致比较不准确要慎重使用。
+
+## Redis通用指令
+### key的操作
+key一定是string类型，常用的操作有：
+* 对于key自身状态的相关操作，如删除、判定存在、获取对应的数据类型；
+* 对key有效性控制相关的操作，如有效期设定、判定是否有效、有效状态的切换等；
+* 对于key的快速查询操作，如指定策略查询key。
+
+状态操作：
+```
+# 删除指定key
+del key
+# 获取key是否存在
+exists key
+# 获取key对应的value类型
+type key
+```
+时效性控制：
+```
+# 为指定key设置有效期
+expire key seconds
+pexpire key milliseconds
+expireat key timestamp
+pexpireat key milliseconds-timestamp
+
+# 获取key的有效时间
+ttl key //如果key不存在返回-2，如果未设置有效期返回-1，否则返回剩余的有效时长
+pttl key
+
+#切换key从时效性转为永久性
+persist key
+```
+扩展操作（查询模式）
+```
+# 查询符合pattern的key
+keys pattern //如keys *表示查询所有的key
+//*匹配任意数量的任意符号，？匹配任意单个字符，[]匹配括号内的任一单个字符
+```
+其他操作：
+```
+# 为key改名
+rename key newkey //如果newkey已经存在则会覆盖
+renamenx key newkey //如果newkey不存在才能改名成功
+
+# 为list/set/sorted_set中所有key排序
+sort key //返回排序的结果，但不会修改原数据顺序
+```
+
+### 数据库的通用指令
+key是由开发者定义的，在使用过程中，伴随着操作数据量的增加会出现大量的数据以及对应的key，数据不区分种类混杂在一起，极易出现重复或冲突。Redis为此提供了解决方案，每个服务提供有16个数据库0~15，每个数据库之间相互独立。
+
+```
+# 切换数据库
+select index //index从0~15
+
+# 其他操作
+quit
+ping
+echo message
+```
+默认在0号数据库，我们只能获得当前数据库中的key，切换到其他数据库后就不能再获取了。这时可以对数据进行移动。
+```
+move key db //移动操作必须保证目标数据库没有同名的key，否则移动失败
+```
+数据清除：
+```
+# 查看当前数据库key数量
+dbsize 
+# 清除当前数据库
+flushdb
+# 清除所有数据库的所有数据
+flushall
+```
