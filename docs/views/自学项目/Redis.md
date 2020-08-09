@@ -339,3 +339,188 @@ flushdb
 # 清除所有数据库的所有数据
 flushall
 ```
+
+## Jedis
+Jedis、SpringData Redis、Lettuce都是Java语言连接操作Redis的工具，使用Jedis的步骤很简单，分为三步：
+```java
+import org.junit.Test;
+import redis.clients.jedis.Jedis;
+
+public class JedisTest {
+    @Test
+    public void testJedis() {
+        //1.连接Redis
+        Jedis jedis = new Jedis("127.0.0.1", 6379);
+        //2.操作Redis
+        jedis.set("name", "Tom");
+        System.out.println(jedis.get("name"));
+        //3.关闭连接
+        jedis.close();
+    }
+}
+```
+其中，jedis对象的操作方法与redis提供的指令完全吻合。以list和hash类型为例简单测试一下：
+```java
+@Test
+public void testList() {
+    jedis.lpush("list1", "a", "b", "c");
+    jedis.rpush("list1", "x");
+    List<String> list1 = jedis.lrange("list1", 0, -1);
+    for (String str : list1) {
+        System.out.println(str);
+    }
+    System.out.println(jedis.llen("list1"));
+}
+
+@Test
+public void testHash() {
+    jedis.hset("hash1", "f1", "v1");
+    jedis.hset("hash1", "f2", "v2");
+    jedis.hset("hash1", "f3", "v3");
+    Map<String, String> hash1 = jedis.hgetAll("hash1");
+    hash1.forEach((k,v)-> System.out.println(k+":"+v));
+    System.out.println(jedis.hlen("hash1"));
+}
+```
+
+### 案例模拟
+假设作为服务提供方我们为A、B、C三个用户提供服务，每分钟限制A用户调用10次、B用户调用30次、C用户不作限制。创建一个多线程类，模拟用户调用。
+```java
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.exceptions.JedisDataException;
+
+public class Service {
+    private String id;
+    private int maxCall;
+    public Service(String id,int maxCall) {
+        this.id = id;
+        this.maxCall = maxCall;
+    }
+
+    //控制单元
+    public void service() {
+        Jedis jedis = new Jedis("127.0.0.1",6379);
+        String value = jedis.get("compid:" + id);
+        try {
+            //判断该值是否存在
+            if (value == null) {
+                jedis.setex("compid:" + id, 5, Long.MAX_VALUE - maxCall + "");
+            } else {
+                Long val = jedis.incr("compid:" + id) - (Long.MAX_VALUE - maxCall);
+                doBusiness(val);
+            }
+        } catch (JedisDataException e) {
+            System.out.println("单位时间内使用次数达到上限");
+        } finally {
+            jedis.close();
+        }
+    }
+
+    //业务操作
+    public void doBusiness(Long val) {
+        System.out.println("用户"+id+"执行第"+val+"次业务操作！");
+    }
+}
+
+class MyThread extends Thread {
+    Service service;
+
+    public MyThread(String id,int maxCall) {
+        service = new Service(id,maxCall);
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            service.service();
+            try {
+                Thread.sleep(300L);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        MyThread mt1 = new MyThread("A",10);
+        mt1.start();
+        MyThread mt2 = new MyThread("B",30);
+        mt2.start();
+    }
+}
+```
+后续还可以对业务控制方案进行改造，例如增加判断用户是否不限次数，是则直接调用业务。另外，调用次数的限制不会写死到程序中，我们可以写入配置文件或者将不同用户的等级信息、限制调用次数存入Redis中。
+
+### Jedis连接池工具类开发
+上面我们每次在控制单元中都手动创建管理Jedis对象，利用Jedis提供的JedisPool我们可以方便地创建连接池。
+```java
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
+
+import java.util.ResourceBundle;
+
+public class JedisUtils {
+    private static JedisPool jp = null;
+    static {
+        ResourceBundle rb = ResourceBundle.getBundle("redis");
+        //Jedis连接池核心配置
+        JedisPoolConfig jpc = new JedisPoolConfig();
+        //最大连接数
+        jpc.setMaxTotal(Integer.parseInt(rb.getString("redis.maxTotal")));
+        //活动连接数
+        jpc.setMaxIdle(Integer.parseInt(rb.getString("redis.maxIdle")));
+        String host = rb.getString("redis.host");
+        int port = Integer.parseInt(rb.getString("redis.port"));
+        jp = new JedisPool(jpc,host,port);
+    }
+
+    public static Jedis getJedis() {
+        return jp.getResource();
+    }
+}
+```
+这时在业务中调用控制逻辑时就可以用JedisUtils.getJedis()来从连接池中取出连接了。
+
+## Linux下安装配置Redis
+以CentOS为例，主要有以下几个步骤：
+* 下载安装包： `wget http://download.redis.io/releases/redis-X.X.X.tar.gz`
+* 解压缩 `tar -xvf 文件名.tar.gz`
+* 编译安装 `make install` 
+    * 如果下载的是6.0以上版本的Redis可能需要安装8版本的gcc、gcc-c++、gdb工具链
+        ```bash
+        yum install centos-release-scl scl-utils-build
+        yum install -y devtoolset-8-toolchain
+        scl enable devtoolset-8 bash
+        gcc --version
+        ```
+之后我们进入到src目录下就能看到安装好的redis-server和redis-cli等可执行文件了。
+
+如果要启动多个Redis服务，需要在启动时指定端口：`redis-server --port 6380`，
+这时客户端连接时也要指明端口：`redis-cli -p 6380`。
+
+### Redis配置
+企业开发中不可能每次都指定端口来启动服务，redis根目录下提供了默认配置文件redis.conf，我们可以查看它并过滤掉注释行和空行：
+```bash
+cat redis.conf  | grep -v "#" | grep -v "^$"
+# 将这些内容追加到一个新的配置文件中以便我们进行修改
+cat redis.conf  | grep -v "#" | grep -v "^$" > redis-6379.conf
+```
+配置文件中注释掉我们暂时不用的内容，只保留下面四条：
+```
+port 6379
+daemonize yes # 是否以守护进程的方式启动
+logfile "6379.log" # 配置日志文件名
+dir /root/redis-6.0.6/data # 生成的日志文件的位置
+```
+现在在启动服务时可以通过`redis-server redis-6379.conf`来加载配置，由于配置了以守护进程的方式启动，所以来确认一下进程是否在运行：
+```bash
+[root@centos-vm redis-6.0.6]# ps -ef | grep redis-
+root      8979     1  0 14:20 ?        00:00:00 redis-server *:6379
+root      8985  7948  0 14:20 pts/0    00:00:00 grep --color=auto redis-
+```
+能够看到该进程id为8979，并且通过redis-cli连接测试成功。使用`kill -s 9 8979`来杀死该进程。
+
+我们在Redis根目录下创建一个conf目录，将配置了不同端口的配置文件放到该目录下，之后就可以用这些配置文件启动多个redis服务进程了。
