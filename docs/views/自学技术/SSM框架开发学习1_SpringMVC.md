@@ -4,7 +4,7 @@ date: 2020-06-15
 tags:
  - SSM
 categories:
- - 自学项目
+ - 自学技术
 ---
 :::tip
 前面学习的手写简易ORM框架的课程让我对对象关系映射有了进一步的理解，接下来学习JavaEE开发中非常典型的SSM框架（Spring MVC、Spring、Mybatis）。

@@ -4,7 +4,7 @@ date: 2020-07-01
 tags:
  - SSM
 categories:
- - 自学项目
+ - 自学技术
 ---
 :::tip
 在前面入门了Spring MVC的基础上，进一步学习Mybatis。

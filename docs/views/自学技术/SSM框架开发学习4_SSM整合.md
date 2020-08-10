@@ -4,7 +4,7 @@ date: 2020-07-21
 tags:
  - SSM
 categories:
- - 自学项目
+ - 自学技术
 ---
 :::tip
 在前面初步入门了Spring、Spring MVC和MyBatis的基础上，整合一个完整可运行的项目。后面还需要深入了解各组件的原理并在学习了Redis之后结合起来使用。

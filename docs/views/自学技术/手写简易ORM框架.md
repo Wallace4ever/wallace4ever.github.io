@@ -4,7 +4,7 @@ date: 2020-06-01
 tags:
  - ORM
 categories:
- - 自学项目
+ - 自学技术
 ---
 
 :::tip

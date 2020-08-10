@@ -4,7 +4,7 @@ date: 2020-07-12
 tags:
  - SSM
 categories:
- - 自学项目
+ - 自学技术
 ---
 :::tip
 今天开始正式入门Spring。
