@@ -852,3 +852,106 @@ georadiusbymember key member radius m|km|ft|mi [withcoord] [withdist] [withhash]
 # 获取指定点对应的坐标hash值
 geohash key member [member ...]
 ```
+
+# Redis集群
+互联网服务要求“高并发”、“高性能”、“高可用”，高可用业界可用性目标为5个9，即全年服务可用时长达到99.999%。而单机的Redis存在以下风险与问题：
+* 机器故障，例如硬盘故障、系统崩溃，可能造成数据丢失对业务造成灾难性打击。
+* 容量瓶颈，内存不足，由于成本和硬件限制不可能无限升级内存
+
+为了避免单点Redis服务器故障，准备多台服务器，互相连通。将数据复制多个副本保存在不同的服务器上，并保证数据是同步的。这就实现了Redis的高可用与数据的冗余备份。
+
+## 主从复制
+我们使用一台主服务器（master）专门负责收集数据（写），并使多台从服务器（slave）与主服务器同步数据，专门负责提供数据（读）。这时的核心工作就是数据从master到slave的复制过程。
+
+主从复制就是将master中的数据即时、有效的复制到slave中，一个master有多个slave，一个slave只有一个master。其作用在于：
+* 读写分离：提高服务器的读写负载能力
+* 负载均衡：基于主从结构配合读写分离，由slave分担master的负载，并根据需求变化改变slave的数量，提高服务器的并发量与数据吞吐量。
+* 故障恢复：当master出现问题，由slave提供服务，实现快速故障恢复。
+* 数据冗余：实现数据的热备份，是持久化之外的一种数据冗余方式。
+* 高可用基石：基于主从复制，构建哨兵模式与集群，实现Redis高可用方案。
+
+主从复制过程大体可以分为3个阶段：
+* 建立连接阶段（准备阶段）
+* 数据同步阶段
+* 命令传播阶段
+
+### 工作流程：建立连接
+1. 首先通过slave客户端向slave服务端发送指令`slaveof ip port`，slave服务端会向master服务端发送连接消息。master服务端接收到指令，响应对方。slave服务端保存master的IP与端口。
+2. slave根据保存的信息创建连接master的socket。
+3. slave还要周期性地发送命令ping，master响应pong
+4. slave可能要发送指令auth password，master做一个验证授权
+5. slave通过replconf listening-port port-number来告知master自己的监听端口，master保存slave的端口号。
+
+至此主从连接成功，之间创建了连接的socket。
+
+为了建立连接，可以在slave客户端使用指令`slaveof ip port`，也可以在slave服务器启动时用命令行参数传入`redis-server ./conf/redis-6380.conf --slaveof 127.0.0.1 6379`，但不推荐这两种方式，我们应该使用配置文件进行配置，直接添加`slaveof 127.0.0.1 6379`。
+
+要断开连接的话，必然是从服务器断开，通过指令`slaveof no one`来断开。
+
+授权访问相关的命令如下（即使不用主从模式配置密码后客户端连接也需要密码）：
+```
+# master配置文件设置密码
+requirepass password
+# master客户端命令设置密码
+config set requirepass password
+config get requirepass
+# 启动客户端设置密码
+redis-cli -a password
+
+# slave客户端发送命令设置连接密码
+auth password
+# slave通过配置文件设置密码
+masterauth password
+```
+
+### 工作流程：数据同步
+1. slave端请求同步数据（向master发送指令psync2）
+2. master创建RDB同步数据（master执行bgsave，第一个slave连接时创建指令缓冲区，生成RDB文件）并通过socket发送给slave，这时RDB文件中不包含缓冲区中可能不断到来的指令。
+3. slave接收RDB，清空数据，执行RDB文件恢复过程【到此为止是全量复制】slave发送命令告知RDB恢复已经完成
+4. slave请求部分同步数据，master复制缓冲区的指令信息再发送
+5. slave恢复部分同步数据，slave接受信息实行bgrewriteaof，恢复数据。【增量复制】
+
+说明：
+1. 如果master数据量巨大，数据同步阶段应该避开流量高峰期，避免造成master阻塞，影响业务正常执行。
+2. master复制缓冲区大小设定不合理会导致数据溢出。可以通过`repl-backlog-size`进行配置。
+3. 为避免slave进行全量复制、部分复制时相应阻塞或者数据不同步，建议关闭此期间的对外查询服务。`slave-serve-stable-data yes|no`
+4. 当有多个slave对master请求数据同步是，master发送的RDB文件增多，会对带宽造成巨大冲击。因此要根绝需求适当错峰。
+5. slave过多是，建议调整拓扑结构，由一主多从变为树状结构，中间结点既是master也是slave。这种方式能缓解master压力，但深度越高的slave与顶层master之间数据同步延迟越大，数据一致性变差应谨慎选择。
+
+### 工作流程：命令传播
+在命令传播阶段如果出现了断网现象，闪断闪连可以忽略，短时间断网需要进行部分复制，长时间断网需要进行全量复制。
+
+部分复制有三个核心要素：
+* 服务器的运行id（run id）
+* 主服务器的复制积压缓冲区
+* 主从服务器的复制偏移量
+
+服务器的运行id是40位16进制字符，每台服务器每次运行都会生成一个不同的运行id。被用在服务器间进行传输，识别身份。
+
+复制积压缓冲区由偏移量和字节值组成，存储的是AOF格式的指令，通过offset区分不同的slave当前数据传播的差异，master和slave分别记录已发送信息和已接受信息的offset。
+
+在数据同步过程中，详细传播的命令如下：
+1. slave首次请求数据同步，发送`psync2 <runid> <offset>` 指令，由于此时master的runid和offset未知，所以发送`psync2 ? -1`；master收到指令后发现需要全量复制，则发送`+FULLSYNC runid offset`,通过socket发送RDB文件给slave。这期间由于master接收客户端命令，offset发声了变化。slave收到`+FULLSYNC`和master的runid和offset进行保存，并通过RDB文件恢复数据。
+2. 之后slave向master发送`psync2 runid offset`，master接收命令，判定runid和自身是否匹配、offset是否在缓冲区中，如果有一个不满足则要进行全量复制；如果runid匹配、offset和master记录的相同则忽略；如果offset在缓冲区中但不相同则发送`+CONTINUE offset`，通过socket发送两边offset之间的数据。slave收到`+CONTINUE`指令后保存master的offset，接收信息并执行bgrewriteaof，恢复数据。完成后不断通过`replconf ack offset`向master报告自己当前的偏移量。
+
+### 心跳机制
+进入命令传播阶段时，master与slave间要进行信息交换，使用心跳机制进行维护，保持双方连接在线。
+* master：指令为PING，用于判断slave是否在线，周期由`repl-ping-slave-period`决定，默认为10秒。
+* slave：指令为REPLCONF ACK {offset}，周期为1秒，用于判断master是否在线，并向master汇报自己的复制偏移量，获取最新的数据变更指令。
+
+当slave多数掉线，或延迟过高时，master为报障数据稳定性，将拒绝所有信息同步操作。
+```
+# 当slave数量少于2个或者所有slave的延迟都大于等于10s时，强制关闭master的写功能，停止数据同步
+min-slaves-to-write 2
+min-slaves-max-lag 10
+```
+
+### 主从复制的常见问题
+* 频繁的全量复制
+    * 伴随系统运行，master数据量增大，一旦master重启，runid将发生变化，会导致全部slave的全量复制操作。Redis内部有优化调整方案，关闭时执行命令 shutdown save，将runid和offset保存到RDB文件中，重启后加载RDB即可恢复runid和offset。
+    * master缓冲区过小，同时网络环境不佳，断网重连后offset越界，触发全量复制，导致slave拒绝对外提供服务。修改缓冲区大小即可解决，大小设置为`2*重连平均时长*master平均每秒产生写命令数据总量`
+* 频繁的网络中断
+    * slave频繁断开连接重连，导致master各种资源被严重占用。可以设置合理的超时时间`repl-timeout`确认是否释放slave（默认为60s）。
+    * slave连接断开，由于master设定的超时时间较短，而ping指令在网络中存在丢包。这时要提高ping指令发送的频度`repl-ping-slave-period`，超时时间`repl-time`应至少为频度的5到10倍否则容易判定slave超时。
+* 多个slave获取相同的数据不同步
+    * 优化主从间的网络环境
