@@ -117,7 +117,7 @@ user:id:123
 ```
 将`user:id:123`作为key，右侧的value作为一个完整的存储空间，那么右侧又是一个key-value结构，这就是Redis的hash类型，不过hash里的key我们称作field。
 
-hash可以对一系列存储的数据进行编组（例如存储对象的各属性），方便管理。其底层如果field数量较少会优化为类数组结构，如果角度使用HashMap结构。
+hash可以对一系列存储的数据进行编组（例如存储对象的各属性），方便管理。其底层如果field数量较少会优化为类数组结构，如果较多使用HashMap结构。
 
 hash类型的基本操作：
 ```
@@ -217,11 +217,11 @@ sinter keyl [key2] ...
 sunion keyl [key2] ...
 sdiff keyl [key2] ... //这里是前面集合减去后面的集合
 # 求两个集合的交、并、差集并存储到指定集合中
-sinterstore destination keyi[key2]
+sinterstore destination key1 [key2]
 sunionstore destination keyl [key2]
 sdiffstore destination keyl [ key2]
 # 将指定数据从原始集合中移动到目标集合中
-srmove source destination member
+smove source destination member
 ```
 redis可以提供基础数据（smembers）也可以提供校验结果（sismember），但后者是把校验的业务逻辑放到存储这边来做了，有一定的耦合，不推荐。
 
@@ -685,7 +685,7 @@ Redis事务就是一个命令执行队列，将一系列预定义命令包装成
 
 Redis服务器在接收到指令后，首先判断本身是否在事务状态：
 * 不在事务状态，识别命令，如果是普通指令则执行并返回结果，如果是multi指令则创建队列返回OK
-* 在事务状态，识别命令，普通命令则加入命令执行队列，exec指令则执行事务并返回事务中每条指令的执行结果并销毁队列，discard指令则直接销毁队列，exec和discard都会推出事务状态。
+* 在事务状态，识别命令，普通命令则加入命令执行队列，exec指令则执行事务并返回事务中每条指令的执行结果并销毁队列，discard指令则直接销毁队列，exec和discard都会退出事务状态。
 
 注意事项：
 * 如果定义事务中包含的命令存在语法错误，则会直接导致该事务被discard。
