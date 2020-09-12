@@ -99,6 +99,8 @@ cat ~/.ssh/id_rsa.pub
 ### 2. 添加Key到GitHub账户
 点击GitHub右上方个人头像，选择菜单中的settings，找到SSH and GPG keys，选择添加SSH Key。任取一个标题（我一般写设备名称便于区分）并将.pub文件中的内容拷贝上去。
 
+![9xxnh.png](https://wx2.sbimg.cn/2020/09/12/9xxnh.png)
+
 添加完成后在终端中测试是否添加成功：
 ```bash
 ssh -T git@github.com
@@ -114,6 +116,7 @@ cd public
 git init
 git add -A
 git commit -m 'deploy'
+# 这里改为你的仓库地址
 git push -f git@github.com:Wallace4ever/wallace4ever.github.io.git master
 cd ../
 ```
