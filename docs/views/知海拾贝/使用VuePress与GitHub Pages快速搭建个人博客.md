@@ -75,7 +75,7 @@ theme-cli init
 可选步骤：我们在GitHub中为仓库创建一个新的分支用于存储博客源文件，例如取名为source分支。使用Git将该仓库克隆到本地，再通过`git checkout source`切换到source分支，将本地的`.git`隐藏文件夹拷贝到博客根目录下，我们就在source分支下进行书写工作了。之后也可以commit在此分支下编辑的内容并push到远程仓库中。
 
 在项目根目录下创建`.gitignore`文件并写入我们希望Git在追踪时忽略的目录：
-```text
+```
 node_modules/
 docs/.vuepress/theme
 package-lock.json
