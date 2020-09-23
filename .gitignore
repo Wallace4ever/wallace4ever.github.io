@@ -3,3 +3,4 @@ docs/.vuepress/theme
 package-lock.json
 package.json
 public/
+**/.DS_Store
