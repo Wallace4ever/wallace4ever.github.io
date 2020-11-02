@@ -535,3 +535,137 @@ drwxrwxrwt. 19 root root 4.0K Nov  1 20:22 /tmp
 drwxr-xr-x. 2 root root 6 Nov  1 20:22 /tmp/testdir
 ```
 :::
+
+### 磁盘的分区、格式化检验与挂载
+一、fdisk是一个功能强大的系统管理工具，可以用于删除、创建、格式化磁盘的分区。输入`fdisk -l`可以查看磁盘列表。直接执行`fdisk [设备文件名]`后我们进入到一个交互式界面，输入m并回车可以显示全部menu，包括了：
+```
+Command action
+a   toggle a bootable flag
+b   edit bsd disklabel
+c   toggle the dos compatibility flag
+d   delete a partition                      # 删除一个分区
+g   create a new empty GPT partition table
+G   create an IRIX (SGI) partition table
+l   list known partition types
+m   print this menu
+n   add a new partition                     # 新增一个分区
+o   create a new empty DOS partition table
+p   print the partition table               # 在屏幕上打印分区表
+q   quit without saving changes             # 不保存在程序内做的改动直接退出
+s   create a new empty Sun disklabel
+t   change a partition's system id
+u   change display/entry units
+v   verify the partition table
+w   write table to disk and exit            # 将改动写入到硬盘后再退出程序
+x   extra functionality (experts only)
+```
+新建分区时会让我们选择分区类型、分区编号、起始sector、结束sector（可以直接指定大小，如+16G）。删除分区时只需要指定分区号。另外书中记载fdisk没办法处理大于2TB的磁盘分区，时至今日我手头没有这么大的硬盘，所以也没法验证现在是否改进了支持，可以使用parted命令来处理。
+
+传统MBR分区硬盘主分区+扩展分区的数量最多只支持到4个，扩展分区进一步划分为逻辑分区时，SATA硬盘最多分到15号分区，IDE硬盘最多分到63号。GPT分区硬盘则可以有很多主分区，当然个人使用时通常不会分到这么多分区。我们在使用d和n删除、新建分区并w保存新的分区表后就需要对各新分区进行格式化。
+
+二、使用mkfs（make file system）对新分区进行格式化。该命令其实是一个综合命令，下面在使用`mkfs -t ext4 ...`时实际上调用的是mkfs.ext4/mke2fs这个命令来进行格式化。
+```bash
+# 这里由于我们没有指定详细的参数，使用的都是默认值
+➜  ~ mkfs -t ext4 /dev/sdb1
+mke2fs 1.42.9 (28-Dec-2013)
+Filesystem label=
+OS type: Linux
+Block size=4096 (log=2)
+Fragment size=4096 (log=2)
+Stride=0 blocks, Stripe width=0 blocks
+262144 inodes, 1048576 blocks
+52428 blocks (5.00%) reserved for the super user
+First data block=0
+Maximum filesystem blocks=1073741824
+32 block groups
+32768 blocks per group, 32768 fragments per group
+8192 inodes per group
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (32768 blocks): done
+Writing superblocks and filesystem accounting information: done 
+```
+mke2fs是一个有着很复杂选项与参数的命令，如果不是高级管理员的话没有特殊需求一般用得不多，了解即可。
+
+三、使用fsck（file system check）来检查文件系统的错乱，常用的选项有：
+* -t，指定文件系统，来综合确定要调用的命令，目前通常可以自动确定FS类型因而一般不需要该选项
+* -A，依据/etc/fstab的内容将需要的设备扫描一次
+* -a/-y，自动修复检查到有问题的扇区
+* -C，使用进度条显示检验进度
+* -f，ext2/3支持强制检查
+* -D，优化ext2/3中的目录
+
+注意，执行fsck时，目标分区不能挂载到系统上。仅在文件系统出问题时root才使用此命令，正常情况使用此命令可能对系统造成危害。
+
+四、使用mount/unmount命令挂载/卸载磁盘
+
+我们在挂载磁盘到目录树时首先要确定几件事
+* 单一文件系统不应该被重复挂载在不同的挂载点中
+* 单一目录不应重复挂载多个文件系统
+* 作为挂载点的目录理论上应该是空目录（非空目录挂载新FS时原来的文件会被暂时隐藏）
+
+直接输入mount会显示目前挂载的信息，mount命令的常用选项有：
+* -a，依照/etc/fstab的配置将所有未挂载的磁盘都挂载上来
+* -t，指定文件系统类型，系统会分析superblock搭配已有的驱动程序去测试挂载，所以一般不需要该选项
+* -L，使用卷标Label来定位磁盘并挂载，默认使用的是设备文件名挂载（/dev/sda1）
+* -o，后接文件系统挂载选项(mount options)，例如ro/rw挂载为只读/读写，remount重新挂载
+* -n，不写入/etc/mtab直接挂载
+* --bind，将某个目录挂载到另一个目录，本质是指向同一个inode。使用场景是适配不支持软连接的软件
+
+-o选项参数比较多，通常我们不用-o选项而是直接使用默认配置挂载磁盘，过程如下。
+```bash
+# 将刚才格式化后的/dev/sdb1挂载
+➜  ~ mkdir /mnt/sdb1       
+➜  ~ mount /dev/sdb1 /mnt/sdb1 
+➜  ~ df -h 
+Filesystem               Size  Used Avail Use% Mounted on
+devtmpfs                 903M     0  903M   0% /dev
+tmpfs                    919M     0  919M   0% /dev/shm
+tmpfs                    919M  9.5M  910M   2% /run
+tmpfs                    919M     0  919M   0% /sys/fs/cgroup
+/dev/mapper/centos-root   47G  7.2G   40G  16% /
+/dev/sda1               1014M  186M  829M  19% /boot
+tmpfs                    184M   28K  184M   1% /run/user/1000
+/dev/sdb1                3.9G   16M  3.6G   1% /mnt/sdb1 # 看到了挂载的磁盘分区
+
+# 将根目录/重新挂载
+➜  ~ mount -o remount,rw,auto /
+```
+
+umount [-option] 设备文件名或挂载点，可以卸载磁盘，选项有-f强制卸载（例如网络文件系统无法读取）、-n不更新/etc/mtab的情况下卸载。
+
+其他较少使用的修改磁盘参数的命令：mknod创建block或character类型的特殊设备文件、e2label设置磁盘分区卷标、tune2fs调整ext文件系统。
+
+### 设置开机挂载、虚拟光驱
+Linux系统挂载的一些限制：
+* 根目录/是必须挂载的，并且是先于其他挂载点被挂载的
+* 其他挂载点必须为已新建的目录，可以任意指定，但需要遵守FHS的原则
+* 需要遵守前面提到的几点原则，不要在同一时间内重复挂载同一分区和同一挂载点
+* 卸载时工作目录不能在挂载点及子目录
+
+一、开机自动挂载的配置文件是/etc/fstab，其格式内容如下：
+```bash
+#
+# /etc/fstab
+# Created by anaconda on Fri Jun 19 21:19:42 2020
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#设备文件名或Label                           #挂载点  #文件系统    #-o参数     #是否做dump备份  #是否进行fsck
+/dev/mapper/centos-root                     /       xfs         defaults    0               0
+UUID=fc04847f-3586-409f-9f10-0167066aa5ce   /boot   xfs         defaults    0               0
+/dev/mapper/centos-swap                     swap    swap        defaults    0               0
+```
+我们只需要按照格式写入需要自动挂载的磁盘分区信息即可，实际上文件系统的挂载是记录到/etc/mtab和/proc/mounts这两个文件中的。一旦fstab中的数据有误导致无法开机而进入单用户维护模式，根目录是只读的状态，这时就需要通过`mount -n -o remount,rw /`来重新挂载根目录，这样就可以进一步修改fstab了。
+
+二、特殊设备loop挂载（就是虚拟光驱）
+loop选项能够在不刻录镜像文件的情况下读取数据。
+```bash
+➜  ~ mkdir /mnt/centos_dvd
+➜  ~ mount -o loop /root/centos_dvd.iso /mnt/centos_dvd # -o后接loop选项
+```
+在某些场景下我们使用虚拟机可以用dd命令创建一个大文件，然后挂载为loop device，就可以在不改变宿主机分区的前提下作为虚拟机的分区（不过虚拟机一般有自己专用的磁盘文件格式吧比如VHD）。使用dd命令创建的大文件也可用作swap（了解，swap在目前硬件条件提高的情况下存在意义已经不大）。
+
