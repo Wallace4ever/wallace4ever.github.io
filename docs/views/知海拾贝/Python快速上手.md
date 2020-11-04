@@ -127,3 +127,73 @@ The population of Texas is 8.56% of the U.S. population.
 '''
 ```
 其中大括号为占位符，前面的数字加冒号对应着后面format的参数序号，冒号后是真正的格式化字符串。可以用`<^>`三个字符分别指定对齐方式，可以接正整数表示对齐域的宽度。最后一位表示数据类型，n表示任意数字，d表示整数，f表示浮点数，%表示百分数，s表示字符，如果是任意一种数字可以接`,`表示添加千位符，如果是浮点数和百分数可以加`.n`表示保留小数点后n位。
+
+### 列表、元组和文件
+Python的核心对象是数值、字符串、列表、元组、文件、集合和字典。
+
+一、列表：list，是Python对象的一个有序序列，其中的对象可以是任意类型，并不要求类型必须一致。Java中的List使用了泛型，要求列表中的元素类型必须一致。
+
+列表的创建要使用中括号将所有元素括起来，元素之间用逗号分隔。例如`team = ["Seahawks", 1024, "University"]`，列表的一些常用操作有：
+* len(myList)，列表中元素的个数
+* max(myList)/min(myList)，列表元素的最大/最小值（列表中必须是同类型的元素）
+* sum(nums)，列表元素求和，元素必须是数字
+* nums.count(num)，列表中对象出现的次数
+* nums.index(num)，一个元素首次在列表中出现的位置
+* nums.reverse()，将列表中的元素逆序
+* nums.clear()，将列表中的元素清空
+* nums.append(num)，将元素插入到列表末端
+* nums.extend([num1, num2])，将新列表追加到已有列表尾部
+* del nums[-1]，删除指定位置的元素
+* nums.remove(nums)，删除指定元素的首次出现
+* nums.insert(1,num)，在指定位置插入元素
+* +，连接两个列表
+* nums * 3，列表重复
+
+```python
+# 示例，输入5个成绩，去掉两个最低分后求平均值
+my_list = [float(input("Enter your 1st grade:")),
+           float(input("Enter your 2nd grade:")),
+           float(input("Enter your 3rd grade:")),
+           float(input("Enter your 4th grade:")),
+           float(input("Enter your 5th grade:"))]
+my_list.remove(min(my_list))
+my_list.remove(min(my_list))
+print("Average is:{0:.2f}".format(sum(my_list) / len(my_list)))
+```
+前面提到过字符串不能直接修改其中的单个字符，即`str[1] = 's'`这样的语句是不合法的，但列表是可以直接替换的，即`listName[1] = ‘"wallace"`这样的语句是没问题的。对应地，在Java的List中，我们只能调用list.set(index, E)来设置元素。
+
+列表切片：和字符串一样列表也支持切片语法，del也可以从列表中直接删除一个切片`del listName[1:3]`，对于切片也可以再使用索引：
+```python
+myList = [1, 2, 3, 4, 5, 6]
+print(myList[1:4][1:3])
+# 输出为[3, 4]
+```
+* 用split()方法快速分割字符串得到列表：`wordList = sentence.split(' ')`，不填分隔字符串的话默认用空白符分割。
+* 用join()方法连接列表中的元素得到字符串：`sentence = ' '.join(wordList)`。需要指定分隔的字符串。
+
+二、文本文件：文本文件的所有行（移除最后的换行符）可以通过以下代码的形式放入一个列表中：
+```python
+infile = open("Data.txt", 'r')
+sentenceList = [line.rstrip() for line in infile]
+infile.close()
+```
+
+三、元组对象：与列表类似是有序序列，但不可以直接修改，没有append/extend/insert方法。除此之外，针对列表的其他函数和方法同样适用，元组中的元素可以索引、切片、连接和重复。定义元组一般用小括号，也可以不用括号：
+```python
+# 两种形式都可以
+tupleA = ('a', 'b', 'c')
+tupleB = 'a', 'b', 'c'
+```
+元组可以用于同时创建多个变量并赋值，或者同时给多个已有的变量赋新值：
+```python
+# 创建了三个变量并赋值，下面的括号都可以去掉
+(a, b, c) = (5, 6, 7)
+
+# 交换数值
+x = 1
+y = 2
+x, y = y, x # 本质上是将元组(2, 1)赋值给了(x, y)
+```
+列表和元组可以互相作为列表和元组的元素，并通过多个中括号访问，和Java中的二维数组比较类似。如果L是由元组构成的列表，那么L[-1][-1]就表示最后一个元组的最后一个元素。
+
+列表是可变对象，但是数值、字符串和元组是不可变对象，对后者的操作均会在内存中分配新的区域来存放结果。如果变量var1是一个可变对象（如list），那么形如var2 = var1的语句会将var2的引用指向var1的同一个对象，对var2的修改会影响到var1的值。使用var2 = list(var1)或者var2 = var1[:]可以避免这种影响。列表和元组不允许索引越界，但可以允许切片索引越界。
