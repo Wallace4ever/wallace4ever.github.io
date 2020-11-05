@@ -754,3 +754,259 @@ dump的恢复使用restore命令（同样地，我在CentOS7下没有找到该�
 dd：convert and copy a file。格式为`dd if=INPUTFILE of=OUTPUTFILE bs=BLOCKSIZE count=NUMBER`，分别指明输入输出文件（可以是设备），block的大小不指名的话默认为512bytes。如果仅仅是指明文件的话看起来好像和cp命令没什么不同，但是通过指定设备文件可以实现扇区或者磁盘备份到文件，恢复的话交换if和of就可以了。由disk到disk甚至不需要经过格式化。
 
 cpio：copy files to and from archives。可以备份任何东西包括设备文件，不过需要结合find等能找到文件名的命令来确定要备份的数据在哪里。
+
+# 第三部分 学习shell与shell script
+## 第10章 vim程序编辑器
+大名鼎鼎的vim编辑器是所有UNIX Like系统都会内置的文本编辑器，学习曲线前期陡峭但学好了编辑速度能大大提升。
+
+vi分为三种模式：一般模式、编辑模式和命令行模式，作用分别如下：
+* 一般模式：打开文件就进入一般模式了，在该模式中可以用方向键来移动光标，可以删除字符或整行，可以复制粘贴文件数据。
+* 编辑模式：在一般模式下输入`i/I/o/O/a/A/r/R`中任意一个字母后才会进入编辑模式，进入编辑模式后按ESC键就可以退回到一般模式。
+* 命令行模式：在一般模式中输入`:`、`/`和`?`三个字符中的任意一个就会进入命令行模式，在该模式下可以提供查找、大量替换字符等额外功能。
+
+### 一般模式下的常用按键说明
+****
+移动与定位
+* 移动光标：使用方向键或者编辑键区的hjkl（对应←↓↑→）可以实现移动光标，想要快速移动多行的话可以用数字+方向来实现，例如要向下移动30行，可以在一般模式下输入`30j`或者`30↓`。
+    * 还可以通过数字+空格实现向右移动光标，数字+Enter实现向下移动光标（不过光标会到行首）
+* PageDown / Ctrl + f，forward向前翻动一页。
+* PageUp / Ctrl + b，backward向后翻动一页。
+* Home / 0，移动到行首
+* End / $，移动到行尾
+* H / M / L，移动到当前屏幕最上方/中间/下方那一行的行首
+* G，移动到文件的最后一行
+* nG，n为数字，移动到第n行
+* gg，移动到文件的第一行，相当于1G
+****
+查找与替换
+* /word，向下查找名为word的字符串
+* ?word，向上查找名为word的字符串
+* n/N，正向/反向重复上一次查找操作。这部分与less很相似。
+* :num1,num2s/word1/word2/g，在num1行和num2行之间（包括num1和num2）寻找word1并替换为word2。num一般是数字，也可以是`$`表示最后一行如`:1,$s/line/pine/gc`表示从第一行到最后一行搜索line替换为pine并让用户confirm。
+****
+删除复制与粘贴
+* x/X，x相当于del向后删除，X向前删除。（backspace不能直接向前删除了，只是移动光标）
+* nx/X，向后或向前删除n个字符
+* dd，删除光标在的一整行
+* ndd，向下删除包括当前行在内的n行
+* d1G，删除光标所在行到第一行的所有行
+* dG，删除光标所在行到最后一行的所有行
+* d$，删除光标所在处到行末的所有字符
+* d0，删除光标所在处到行首的所有字符
+* yy，复制光标所在的行（yank）
+* nyy，复制光标所在的向下n行
+* y1G，复制光标所在行到第一行的数据
+* yG，复制光标所在行到最后一行的所有数据
+* y0，复制光标所在处到行首的所有数据
+* y$，复制光标所在处到行末的所有数据
+* p/P，p将已复制的数据粘贴在光标下一行，P将数据粘贴在上一行
+* J，将光标所在行与下一行合并成一行
+* u，复原前一个操作undo
+* Ctrl + r，重做撤销的操作redo
+* .，重复前一个操作
+****
+切换到编辑模式
+* i/I，i是在光标所在处插入insert，I是在目前行的第一个非空格字符处插入。
+* a/A，进入插入模式append，a是在光标后插入，A是在行最后一个字符处插入。
+* o/O，插入模式，o在下一行插入新行，O在上一行插入新行。
+* r/R，进入替换模式，r只会替换光标所在字符1次，R会一直替换直到按下ESC为止。
+****
+切换到命令行模式
+* :w，将编辑内容写入文件
+* :w!，强制写入只读文件（前提是你可以修改文件的权限）
+* :q，退出vim
+* :q!，丢弃修改退出vim
+* :wq，写入并退出
+* :wq!，强制写入并退出
+* ZZ，保存后离开vim（没有冒号）
+* :w FILENAME，另存一份到名为FILENAME的新文件中
+* :r FILENAME，读入FILENAME的文件并将内容插入到光标所在行后面
+* :n1,n2 w FILENAME，将第n1行到n2行之间的内容保存成新文件
+* :! COMMAND，暂时离开vim而执行Linux命令，像ll这样的别名不能执行
+* :set nu/nonu，设置vim环境显示行号/取消行号
+
+打开文件时的警告：鸟哥提到vim通过在当前目录下创建.FILENAME.swp来暂存对文件的改动（但我按照他的方法测试后并没有发现这个隐藏文件，并且通过kill模拟意外退出再重新编辑该文件后也没有出现"Found a swap file by the name ..."的提示，所以这边只能看看理论）
+
+出现该警告一般有两种情况：1.上次由于某些原因导致vim被中断；2.可能有其他人正在编辑该文件。vim提供了一些选项：
+* [O]pen read-only，以只读方式打开。
+* [E]dit anyway，以正常方式打开文件，并不会加载暂存文件。
+* [E]ecover，加载暂存文件内容用于恢复。
+* [D]elete it，删除暂存文件并继续编辑文件。
+* [Q]uit，离开vim。
+* [A]bort，同上。
+
+### vim的功能
+一、块选择：前面的操作都是以行为单位的操作，如果想要实现在sublime中的鼠标中键选择一块文本的功能，可以使用块选择。
+* v，字符选择，会将光标经过的地方反白选择
+* V，行选择，会将光标经过的行反白选择
+* Ctrl + v，块选择，以光标起始点和结束点为顶点的矩形范围
+* y，将反白的地方复制（yank）
+* d，将反白的地方删除
+
+二、多文件编辑：vim可以同时打开多个文件用于复制，我们在使用vim时后接多个文件来打开它们。
+* :n，编辑下一个文件
+* :N，编辑上一个文件
+* :files，列出当前vim打开的所有文件
+
+三、多窗口功能：如果一个文件非常大，通过`Ctrl + f`和`Ctrl + b`来翻页很麻烦或者有多个文件需要比较，这时就可以通过`:sp`（split）命令来分割窗口。
+* :sp 或 Ctrl + w 再 s，分割窗口显示当前文件
+* :sp FILENAME，分割窗口打开新文件
+* Ctrl + w 再 h/j/k/l（或对应的方向键），将光标聚焦到对应方向的窗口
+* Ctrl + w 再 H/J/K/L，调整光标所在窗口在显示器中的方位（类似于Windows Aero Snap）
+* Ctrl + w 再 t/b/p，移动光标到左上角/右下角/上一次在的窗口
+* Ctrl + w 再 q，退出关闭当前窗口
+* 如果配置了`set mouse=a`那么可以通过鼠标调整各窗口的边框宽窄，否则通过`Ctrl + w 再 </>/+/-`可以微调水平尺寸与垂直尺寸。
+
+四、vim配置：通过`:set all`能查看全部的vim设置，也可以直接配置~/.vimrc。这里提供一个比较舒服的配置。
+
+:::details
+```bash
+"打开语法高亮
+syntax on
+
+"使用配色方案
+colorscheme desert
+
+"打开文件类型检测功能
+filetype on
+
+"不同文件类型采用不同缩进
+filetype indent on
+
+"允许使用插件
+filetype plugin on
+filetype plugin indent on
+
+"关闭vi模式
+set nocp
+
+"与windows共享剪贴板
+set clipboard+=unnamed
+
+"取消VI兼容，VI键盘模式不易用
+set nocompatible
+
+"显示行号, 或set number
+set nu
+
+"历史命令保存行数 
+set history=100 
+
+"当文件被外部改变时自动读取
+set autoread 
+
+"取消自动备份及产生swp文件
+set nobackup
+set nowb
+set noswapfile
+
+"允许使用鼠标点击定位
+set mouse=a
+
+"允许区域选择
+set selection=exclusive
+set selectmode=mouse,key
+
+"高亮光标所在行
+"set cursorline
+
+"取消光标闪烁
+"set novisualbell
+
+"总是显示状态行
+set laststatus=2
+
+"状态栏显示当前执行的命令
+set showcmd
+
+"标尺功能，显示当前光标所在行列号
+set ruler
+
+"设置命令行高度为3
+set cmdheight=2
+
+"粘贴时保持格式
+set paste
+
+"高亮显示匹配的括号
+set showmatch
+
+"在搜索的时候忽略大小写
+set ignorecase
+
+"高亮被搜索的句子
+set hlsearch
+
+"在搜索时，输入的词句的逐字符高亮（类似firefox的搜索）
+set incsearch
+
+"继承前一行的缩进方式，特别适用于多行注释
+set autoindent
+
+"为C程序提供自动缩进
+set smartindent
+
+"使用C样式的缩进
+set cindent
+
+"制表符为4
+set tabstop=4
+
+"统一缩进为4
+set softtabstop=4
+set shiftwidth=4
+
+"允许使用退格键，或set backspace=2
+set backspace=eol,start,indent
+set whichwrap+=<,>,h,l
+
+"取消换行
+set nowrap
+
+"启动的时候不显示那个援助索马里儿童的提示
+"set shortmess=atI
+
+"在被分割的窗口间显示空白，便于阅读
+set fillchars=vert:\ ,stl:\ ,stlnc:\
+
+"光标移动到buffer的顶部和底部时保持3行距离, 或set so=3
+set scrolloff=3
+
+"设定默认解码
+set fenc=utf-8
+set fencs=utf-8,usc-bom,euc-jp,gb18030,gbk,gb2312,cp936
+
+"设定字体
+set guifont=Courier_New:h11:cANSI
+set guifontwide=新宋体:h11:cGB2312
+
+"设定编码，如要使用中文将下面的两行取消注释即可
+set enc=utf-8
+set fileencodings=ucs-bom,utf-8,chinese
+"set langmenu=zh_CN.UTF-8
+"language message zh_CN.UTF-8
+source $VIMRUNTIME/delmenu.vim
+source $VIMRUNTIME/menu.vim
+
+"自动补全
+filetype plugin indent on
+set completeopt=longest,menu
+
+"自动补全命令时候使用菜单式匹配列表
+set wildmenu
+autocmd FileType ruby,eruby set omnifunc=rubycomplete#Complete
+autocmd FileType python set omnifunc=pythoncomplete#Complete
+autocmd FileType javascript set omnifunc=javascriptcomplete#CompleteJS
+autocmd FileType html set omnifunc=htmlcomplete#CompleteTags
+autocmd FileType css set omnifunc=csscomplete#CompleteCSS
+autocmd FileType xml set omnifunc=xmlcomplete#CompleteTags
+autocmd FileType java set omnifunc=javacomplete#Complet
+```
+:::
+
+**其它注意事项**
+vim将用户的对于文件的编辑信息（例如搜索过的pattern、编辑位置）记录在~/.viminfo中。
+
+建议大家文件编码为utf-8，但某些Windows上简体中文编码默认为gb2312，可以设置机器的语系`LANG=zh_CN.gb2312`来临时解决。
+
+Windows和Linux/Mac的断行不同，前者采用CRLF（\r\n），而后者采用LF（\n），所以在不同操作系统间传输文件时可能需要转换。
