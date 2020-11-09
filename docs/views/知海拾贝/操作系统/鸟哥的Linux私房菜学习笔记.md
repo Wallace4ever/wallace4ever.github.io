@@ -100,7 +100,7 @@ chmod a-x myscript.sh
 
 **umask**
 
-使用umask [-S]可以查看或修改，它指的是创建文件或目录时u/g/o要拿掉的权限，文件的默认权限是666，目录的默认权限是777。，root用户的umask为022，表示对于user不拿掉任何权限，对于group和others拿掉写权限。一般身份用户的umask通常为002，即保留用户组的写入权力。
+使用umask [-S]可以查看或修改，它指的是创建文件或目录时u/g/o要拿掉的权限，文件的默认权限是666，目录的默认权限是777。root用户的umask为022，表示对于user不拿掉任何权限，对于group和others拿掉写权限。一般身份用户的umask通常为002，即保留用户组的写入权力。
 
 **chattr**和**lsattr**
 
@@ -500,7 +500,7 @@ Linux下的连接文件有两种，一种是类似Windows快捷方式功能的�
     # 在当前目录下建立目标文件的硬连接
     ➜  ~ ln /etc/crontab . 
     # 比较两个目录下文件的信息，发现两个不同的文件名指向同一个inode
-    ➜  ~ llll -i /etc/crontab ./crontab         
+    ➜  ~ ll -i /etc/crontab ./crontab         
     34934914 -rw-r--r--. 2 root root 451 Jun 10  2014 ./crontab
     34934914 -rw-r--r--. 2 root root 451 Jun 10  2014 /etc/crontab
     ```
@@ -690,7 +690,7 @@ loop选项能够在不刻录镜像文件的情况下读取数据。
 
 使用zcat可以直接查看经由gzip和compress压缩后的纯文本文件。
 
-二、bzip2压缩，其用法和gzip几乎相同，同样具有-c/-d/-t/-v/-#的选项，此外还有-k（--keep）保留源文件，-z强制压缩等选项。bzip2能提供比gzip更优的压缩比。压缩后的文本文件可以用bzcat来直接读取
+二、bzip2压缩，其用法和gzip几乎相同，同样具有-c/-d/-t/-v/-#的选项，此外还有-k（--keep）保留源文件，-z强制压缩等选项。bzip2能提供比gzip更优的压缩比。压缩后的文本文件可以用bzcat来直接读取。
 
 ### 打包命令tar
 虽然gzip和bzip2都可以针对目录进行压缩，不过指的是将目录内的所有文件分别进行压缩。想要整体压缩则需要使用tar来打包，同时tar也可以通过gzip/bzip2的支持将打包后的文件同时压缩。
@@ -737,7 +737,7 @@ tar: Removing leading `/' from member names
 tar可以同时打包压缩多个目录并且排除特定文件，还可以利用管道命令和数据流，这些到bash部分再详细介绍。
 
 ### 完整备份工具dump
-（我在CentOS7下为找到该命令所以没法验证，应该不是dumpe2fs吧）dump除了能够针对整个文件系统进行备份，也可以仅仅针对目录进行备份。其格式为`dump [-Suvj] [-level] [-f 备份文件] 待备份数据`，进行一些简单的备份操作常用的选项有：
+（我在CentOS7下未能找到该命令所以没法验证，应该不是dumpe2fs吧）dump除了能够针对整个文件系统进行备份，也可以仅仅针对目录进行备份。其格式为`dump [-Suvj] [-level] [-f 备份文件] 待备份数据`，进行一些简单的备份操作常用的选项有：
 * -S，仅列出后面待备份的数据需要多少磁盘空间才能备份完毕
 * -u，将这次dump时间记录到/etc/dumpdates中
 * -v，啰嗦模式
@@ -830,7 +830,7 @@ vi分为三种模式：一般模式、编辑模式和命令行模式，作用分
 出现该警告一般有两种情况：1.上次由于某些原因导致vim被中断；2.可能有其他人正在编辑该文件。vim提供了一些选项：
 * [O]pen read-only，以只读方式打开。
 * [E]dit anyway，以正常方式打开文件，并不会加载暂存文件。
-* [E]ecover，加载暂存文件内容用于恢复。
+* [R]ecover，加载暂存文件内容用于恢复。
 * [D]elete it，删除暂存文件并继续编辑文件。
 * [Q]uit，离开vim。
 * [A]bort，同上。
@@ -1010,3 +1010,66 @@ vim将用户的对于文件的编辑信息（例如搜索过的pattern、编辑�
 建议大家文件编码为utf-8，但某些Windows上简体中文编码默认为gb2312，可以设置机器的语系`LANG=zh_CN.gb2312`来临时解决。
 
 Windows和Linux/Mac的断行不同，前者采用CRLF（\r\n），而后者采用LF（\n），所以在不同操作系统间传输文件时可能需要转换。
+
+## 第11章 认识与学习bash
+操作系统通过内核来管理硬件，但用户不能直接操作内核，一般用户只能通过shell来和内核进行通信。我们可以在/etc/shells这个文件中查看可以使用哪些shell。
+```bash
+➜  ~ cat /etc/shells      
+/bin/sh # Bourne Shell
+/bin/bash # Bourne Again Shell，默认取代了Bourne Shell
+/bin/tcsh
+/bin/csh
+/bin/zsh # 基于贝尔实验室开发的ksh而来
+```
+在/etc/passwd这个文件中记录了每个用户默认登陆后使用什么shell，下面的/sbin/nologin就是一种奇怪的shell，让用户无法以其它服务登录主机。
+```bash
+➜  ~ cat /etc/passwd
+root:x:0:0:root:/root:/bin/zsh
+bin:x:1:1:bin:/bin:/sbin/nologin
+daemon:x:2:2:daemon:/sbin:/sbin/nologin
+```
+Linux的默认shell是bash，高版本的MacOS将默认shell改为了zsh，我个人使用zsh并启用了oh my zsh。但通常使用上zsh和bash基本一致，只是一些体验不同。
+
+### bash的功能
+bash具有丰富的功能，zsh也类似：
+* 命令历史记录，在~/.bash_history中记录了bash执行的命令历史记录，可以通过上下方向键或者history命令查看。
+* 命令与文件补全功能，按下tab能补全。
+* 命令别名设置，输入`alias`可以查看当前shell设置了哪些别名，例如`ll='ls -lh'`。也可以通过`alias lm='ls -la'`这样的命令来设置别名。
+* 作业控制、前台后台控制，通过该功能可以在单一登录环境中达到多任务的目的。
+* 程序脚本（Shell Script），可以将需要连续执行的命令写成一个脚本文件，该脚本可以通过交互式的方式来工作，也可以通过shell的环境变量来设计。
+* 通配符（wildcard），bash支持许多通配符来帮助用户查询执行命令。
+
+内置命令`type`：bash提供了一些内置命令如cd、umask，我们可以使用`type [-tpa] COMMAND`命令查看某个命令的类型，常用的选项有：
+* -t，不加参数时，type会显示命令是外部命令还是内置命令。加上-t会显示是file（外部命令）、alias（别名）还是builtin（内置命令），（zsh下调用type不支持-t选项）。
+* -p，显示外部命令包含完整path的文件名。
+* -a，在PATH定义的所有路径中将所有含有COMMAND的命令都列出来。
+
+### Shell的变量功能
+变量简单来说就是用一个特定的简单字符来代表另一个比较复杂或者易变动的数据。例如，不同用户的变量`MAIL`指向不同的邮箱文件，那么不同的用户使用mail这个命令时，就会根据这个变量读取不同的邮箱文件。某些特定的变量会影响到bash的环境例如PATH、HOME、MAIL、SHELL等，为了区别与自定义变量的不同环境变量一般以大写字符表示。
+
+另外，在编写shell script的时候，使用自定义变量很方便。例如需要用到某个很长的路径，使用变量只需要在前面定义一次后面就不需要反复输入这个很长的路径；同时如果以后要修改也只需修改前面变量的定义，而不是反复修改脚本中的多个地方。
+
+我们可以使用`echo $variable`来查看“variable”这个变量，而设置变量则要满足一定规则：
+* 变量名与变量内容以一个等号来连接，如`myName=Wallace`；等号两边不能有空格，像`my Name=Wallace`和`myName=Wallace Xu`这样都是错误的；变量名称只能由英文字符与数字组成，但开头不能是数字；变量内容中如果有空格可以用英文的双引号或单引号将变量内容括起来，但：
+    * 双引号内的特殊字符如`$`等可以保持原有特性，如设置`var="lang is $LANG"`，则`echo $var`得到`lang is en_US.UTF-8`。
+    * 单引号内的特殊字符如`$`仅为纯文本，如设置`var='lang is $LANG'`，则`echo $var`得到`lang is $LANG`。
+* 可以用转义字符`\`将特殊符号如回车、dollar符、反斜线、空格、感叹号等变成一般字符。
+* 如果需要在设置变量时调用其他命令，可以用两个重音符将命令括起来或者用`$(COMMAND)`，例如`version=$(uname -r)`再`echo $version`可以得到`3.10.0-1127.19.1.el7.x86_64
+`。
+* 增加已有变量的内容可以使用`"$变量名称"`或`${变量}`加要累加的内容，如：`PATH="$PATH":/home/bin`。
+* 若该变量需要在其他子进程执行，则需要以`export VARIABLE`来使变量成为环境变量。
+
+使用`unset var`来取消设置变量。
+
+```bash
+# 范例：如何进入到你当前内核的模块目录？
+cd /lib/modules/`uname -r`/kernel # ``之间的命令的输出会作为输入
+cd /lib/modules/$(uname -r)/kernel # 同上
+```
+
+使用`env`可以查看当前所有的环境变量，像HOME、SHELL、LANG、这些都是常用的变量，值得一提的是`RANDOM`变量，目前的Linux Distribution基本上都会有随机数生成器`/dev/random`，我们可以通过该变量取得随机值，随机值在0~32767之间，要使用0~9之间的数值，利用declare声明数值类型：
+```bash
+declare -i number=$RANDOM*10/32768;echo $number
+```
+
+使用`set`可以查看所有的变量（包含环境变量与自定义变量）。像`$`本身也是一个变量，代表了当前shell的pid。用户在登录后拿到shell就是一个进程，在该进程下再执行bash就是前一个bash的子进程，子进程会继承父进程的环境变量，但不会继承父进程的自定义变量，所以通过export将变量变为环境变量就可以让该变量值继续存在于子进程中。
