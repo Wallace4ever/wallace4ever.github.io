@@ -232,7 +232,7 @@ not(10 < x < 20)
 ```
 
 ### 判断结构
-Python中的if-else语句：
+一、Python中的if-else语句：
 ```python
 if condition1:
 	indented block of statements
@@ -242,3 +242,51 @@ else:
 	indented block of statements
 ```
 else子句可以省略，缩进的语句块中可以进一步嵌套if-else语句块，其中如果有多个判断选项可以使用elif子句。
+
+Python中每一个对象都有一个真值与其相连：在数字用作条件时0会被赋值为False，所有其他数字会被赋值为True；用作条件的空字符串、空列表和空元组代表了False，否则值为True。
+
+二、Python中的循环语句：
+```python
+# while语句
+while condition:
+	indented block of statements
+# for语句
+for var in sequence:
+	indented block of statements
+```
+在循环语句中一样可以结合if、break、continue来控制逻辑。for循环类似于Java中的增强for，循环条件中的sequence可以是等差数列、字符串、列表、元组或者文件对象。使用range(m,n)函数可以生成一个从m到n左闭右开的等差序列，该序列可以作为for循环条件中的sequence，range(0,n)可以简写为range(n)，除了前两个参数range函数还能再加一个参数步长step，step需要是整数。
+```python
+# 示例：将十二个月份替换为其3个字母的简称并输出
+months = ["January", "February", "March", "April", "May", "June",
+          "July", "August", "September", "October", "November", "December"]
+for i in range(len(months)):
+    months[i] = months[i][:3]
+print(months)
+```
+
+**pass语句，一个特殊的例子：**
+
+for循环后必须紧跟一个至少有一条语句的语句块，然而有时只希望遍历一个序列而不做任何事，这时应当使用pass语句，例如要显示文件中的最后一行：
+```python
+infile = open("test.txt", 'r')
+for line in infile:
+	pass
+print(line.strip())
+infile.close()
+```
+这个例子就体现出Python和Java的差异，由于Python是脚本语言读一行执行一行，一旦变量被创建就保持在内存中，没有作用域和生命周期的概念。所以在例子中，for循环结束后line依然存在于内存中并且内容是文件的最后一行。
+
+使用文本文件创建列表的方式：
+```python
+infile = open("test.txt", 'r')
+sentenceList = []
+for line in infile:
+	sentenceList.append(line.strip())
+infile.close()
+```
+更高效的方式：
+```python
+infile = open("test.txt", 'r')
+sentenceList = [line.strip() for line in infile]  # 这里还可以对line进一步操作例如eval(line)
+infile.close()
+```
