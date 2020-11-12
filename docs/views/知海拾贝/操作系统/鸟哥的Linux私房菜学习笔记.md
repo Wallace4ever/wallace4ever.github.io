@@ -1044,32 +1044,87 @@ bash具有丰富的功能，zsh也类似：
 * -p，显示外部命令包含完整path的文件名。
 * -a，在PATH定义的所有路径中将所有含有COMMAND的命令都列出来。
 
+bash内置的`ulimit`命令可以限制用户使用的某些系统资源，例如CPU时间、内存总量等。使用-a选项可以查看当前用户的限制：
+```bash
+➜  ~ ulimit -a
+-t: cpu time (seconds)              unlimited
+-f: file size (blocks)              unlimited
+-d: data seg size (kbytes)          unlimited
+-s: stack size (kbytes)             8192
+-c: core file size (blocks)         0
+-m: resident set size (kbytes)      unlimited
+-u: processes                       15024
+-n: file descriptors                1024
+-l: locked-in-memory size (kbytes)  64
+-v: address space (kbytes)          unlimited
+-x: file locks                      unlimited
+-i: pending signals                 15024
+-q: bytes in POSIX msg queues       819200
+-e: max nice                        0
+-r: max rt priority                 0
+-N 15:                              unlimited
+```
+ulimit的其他选项：
+* -H，硬limit，必定不能超过此值
+* -S，软limit，超过此值会发出警告
+* -c，进程出错系统产生的core file的最大容量
+* -f，此shell可产生的最大文件容量
+* -d，进程可使用的最大内存分段的容量data seg size
+* -l，可用于锁定的内存量
+* -t，可使用的CPU时间
+* -u，单用户可以使用的最大进程量
+
 ### Shell的变量功能
 变量简单来说就是用一个特定的简单字符来代表另一个比较复杂或者易变动的数据。例如，不同用户的变量`MAIL`指向不同的邮箱文件，那么不同的用户使用mail这个命令时，就会根据这个变量读取不同的邮箱文件。某些特定的变量会影响到bash的环境例如PATH、HOME、MAIL、SHELL等，为了区别与自定义变量的不同环境变量一般以大写字符表示。
 
 另外，在编写shell script的时候，使用自定义变量很方便。例如需要用到某个很长的路径，使用变量只需要在前面定义一次后面就不需要反复输入这个很长的路径；同时如果以后要修改也只需修改前面变量的定义，而不是反复修改脚本中的多个地方。
 
-我们可以使用`echo $variable`来查看“variable”这个变量，而设置变量则要满足一定规则：
+一、变量定义的规则：我们可以使用`echo $variable`来查看“variable”这个变量，而设置变量则要满足一定规则：
 * 变量名与变量内容以一个等号来连接，如`myName=Wallace`；等号两边不能有空格，像`my Name=Wallace`和`myName=Wallace Xu`这样都是错误的；变量名称只能由英文字符与数字组成，但开头不能是数字；变量内容中如果有空格可以用英文的双引号或单引号将变量内容括起来，但：
     * 双引号内的特殊字符如`$`等可以保持原有特性，如设置`var="lang is $LANG"`，则`echo $var`得到`lang is en_US.UTF-8`。
     * 单引号内的特殊字符如`$`仅为纯文本，如设置`var='lang is $LANG'`，则`echo $var`得到`lang is $LANG`。
 * 可以用转义字符`\`将特殊符号如回车、dollar符、反斜线、空格、感叹号等变成一般字符。
 * 如果需要在设置变量时调用其他命令，可以用两个重音符将命令括起来或者用`$(COMMAND)`，例如`version=$(uname -r)`再`echo $version`可以得到`3.10.0-1127.19.1.el7.x86_64
 `。
+    ```bash
+    # 范例：如何进入到你当前内核的模块目录？
+    cd /lib/modules/`uname -r`/kernel # ``之间的命令的输出会作为输入
+    cd /lib/modules/$(uname -r)/kernel # 同上
+    ```
 * 增加已有变量的内容可以使用`"$变量名称"`或`${变量}`加要累加的内容，如：`PATH="$PATH":/home/bin`。
 * 若该变量需要在其他子进程执行，则需要以`export VARIABLE`来使变量成为环境变量。
 
-使用`unset var`来取消设置变量。
-
-```bash
-# 范例：如何进入到你当前内核的模块目录？
-cd /lib/modules/`uname -r`/kernel # ``之间的命令的输出会作为输入
-cd /lib/modules/$(uname -r)/kernel # 同上
-```
-
-使用`env`可以查看当前所有的环境变量，像HOME、SHELL、LANG、这些都是常用的变量，值得一提的是`RANDOM`变量，目前的Linux Distribution基本上都会有随机数生成器`/dev/random`，我们可以通过该变量取得随机值，随机值在0~32767之间，要使用0~9之间的数值，利用declare声明数值类型：
+二、环境变量与自定义变量：使用`unset var`来取消设置变量。使用`env`可以查看当前所有的环境变量，像`HOME`、`SHELL`、`LANG`、这些都是常用的变量，值得一提的是`RANDOM`变量，目前的Linux Distribution基本上都会有随机数生成器`/dev/random`，我们可以通过该变量取得随机值，随机值在0~32767之间，要使用0~9之间的数值，利用declare声明数值类型：
 ```bash
 declare -i number=$RANDOM*10/32768;echo $number
 ```
 
-使用`set`可以查看所有的变量（包含环境变量与自定义变量）。像`$`本身也是一个变量，代表了当前shell的pid。用户在登录后拿到shell就是一个进程，在该进程下再执行bash就是前一个bash的子进程，子进程会继承父进程的环境变量，但不会继承父进程的自定义变量，所以通过export将变量变为环境变量就可以让该变量值继续存在于子进程中。
+使用`set`可以查看所有的变量（包含环境变量与自定义变量）。像`$`本身也是一个变量，代表了当前shell的pid。用户在登录后拿到shell就是一个进程，在该进程下再执行bash就是前一个bash的子进程，子进程会继承父进程的环境变量，但不会继承父进程的自定义变量，所以通过`export`将变量变为环境变量就可以让该变量值继续存在于子进程中。
+```bash
+echo $$ # 查看当前shell的pid
+echo $? # 查看上一个命令的回传码，上次成功的话回传码为0，否则非0
+```
+
+使用`locale`命令可以查看当前的语系设置，包括时间、货币、字符串格式等等，使用-a选项可以查看系统所有支持的语系。语系可以通过`LANG`这个环境变量修改。
+
+三、使用`read`从键盘读取变量：该命令常用在shell script中，格式为`read [-pt] variable`，将用户输入的内容读取到变量variable中。-p选项可以后接自定义的提示字符串（prompt），-t选项后接最长等待的秒数，限定时间内用户没有输入则略过。
+
+使用bash内置的`declare`或`typeset`命令（两者相同）可以声明变量的类型（默认为字符型）：
+* -a，声明后接的变量为数组类型array
+* -i，声明后接的变量为整数类型integer。如`declare -i sum=10+20`
+* -x，export，将变量设为环境变量（+x是取消设为环境变量）
+* -r，将变量设为只读，变量不可以被重设或修改
+* -p，列出已经声明的某变量类型
+
+bash环境中的数值运算只能为整形，所以1/3的结果为0。
+
+数组类型的变量可以通过`variable[n]`来定义和访问，n就是索引index
+```bash
+➜  ~ var[1]=65        
+➜  ~ var[2]=89
+➜  ~ echo $var   
+65 89
+➜  ~ declare -p var
+typeset -a var
+var=(65 89)
+```
