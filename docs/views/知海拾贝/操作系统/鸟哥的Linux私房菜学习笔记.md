@@ -1044,7 +1044,7 @@ bash具有丰富的功能，zsh也类似：
 * -p，显示外部命令包含完整path的文件名。
 * -a，在PATH定义的所有路径中将所有含有COMMAND的命令都列出来。
 
-bash内置的`ulimit`命令可以限制用户使用的某些系统资源，例如CPU时间、内存总量等。使用-a选项可以查看当前用户的限制：
+bash内置的`ulimit`命令可以限制用户使用的某些系统资源，例如CPU时间、内存总量等。使用-a选项可以查看当前用户的限制（显示的信息中也说明了每个选项的含义）：
 ```bash
 ➜  ~ ulimit -a
 -t: cpu time (seconds)              unlimited
@@ -1127,4 +1127,107 @@ bash环境中的数值运算只能为整形，所以1/3的结果为0。
 ➜  ~ declare -p var
 typeset -a var
 var=(65 89)
+```
+
+四、变量内容的部分删除与替换：
+
+通常访问变量的写法为`${variable}`，如果仅仅是读取内容那么我们往往将`echo ${variable}`简写成`echo $variable`，但是要在使用变量的同时作修改的话就一定要加上大括号，使用方法：
+
+**从头或者尾删除一部分字符**
+* `${variable#start*end}`，警号表示从变量内容开头向后寻找到首个内容为end的部分并删除之，星号为通配符可代表任意长度的字符，start和end不可以同时省略。
+* `${variable##start*end}`，和上面不同之处在于##表示最长匹配，从开头向右删除能匹配的最长字符串。
+* `${variable%start*end}`，从右向左搜索匹配的字符串并删除，最短匹配。
+* `${variable%%start*end}`，从右向左删除，最长匹配。
+
+**替换指定字符串**
+* `${variable/oldStr/newStr}`，将从左到右首次出现的oldStr替换为newStr。
+* `${variable//oldStr/newStr}`，将出现的所有oldStr替换为newStr。
+
+**根据旧值是否存在进一步设置新值**
+* `${oldVariable-newContent}`，如果variable存在则结果是variable的内容，否则就是newContent。可以将结果赋给newVariable，也可以赋给oldVariable（其实就是有就使用没有则默认设为newContent）。
+* `variable=${variable:-newContent}`，如果变量内容为空或未设置都会被赋以新的内容。
+* `variable=${variable+newContent}`，除了变量未被设置时外都将newContent赋给结果。
+* `variable=${variable:+newContent}`，变量已设置且不为空时才将newContent赋给结果。
+* 此外还有=、:=、?、:?暂时先略过。
+
+### 命令别名与历史命令
+一、别名alias：前面我们提到过常用的`ll`其实就是`ls -lh`的别名，在bash中可以使用`alias customName='COMMAND [-options]'`来设置别名，使用`unalias customName`可以取消别名，直接输入alias可以查看目前已经设置了那些别名。
+
+二、历史命令history：使用history可以查看bash的历史记录（存储在~/.bash_history中），常用的参数和选项有：
+* n，列出最近的n条记录（我试了下似乎总是显示全部历史记录）
+* -c，清除目前shell的全部历史记录
+* -a，将目前新增的命令历史追加写入到histfiles中，未指定则默认写入.bash_history
+* -r，将histfiles的内容读到目前shell的history记忆中
+* -w，立刻将目前的历史记录写入到histfiles中（默认是注销时写入）
+
+历史记录不仅可以用来查询，也可以用来帮助执行命令。
+* !n，执行记录中的第n条命令
+* !!，执行上一条命令，例如执行命令并发现需要root权限可以使用`sudo !!`
+* !COMMAND，执行最近的以COMMAND开头的命令，COMMAND可以不用写完整
+
+注意如果同一个用户通过多个bash登录，最后一个注销的bash会覆盖掉前面的bash写入的会话内历史记录。
+
+### Bash Shell的操作环境
+一、执行命令的顺序：bash确定执行命令的位置的顺序是：相对绝对路径>别名>内置命令>$PATH中第一个找到的命令。
+
+二、bash的登录与欢迎信息：在/etc/issue中记录了登录系统前看到的欢迎信息，默认内容是：
+```bash
+➜  ~ cat /etc/issue # 查看内容
+\S
+Kernel \r on an \m
+
+# 登录前看到的欢迎信息
+Cent0S Linux 7 (Core)
+Kernel 3.16.B-1127.19.1.e17.x86_64 on an x86_64
+```
+内容中的转义字符含义如下：
+* \d，本地端的日期
+* \t，本地端的时间
+* \l，显示是第几个终端机接口
+* \m，显示硬件等级
+* \n，显示主机的网络名称
+* \o，显示domain name
+* \r，显示操作系统的release版本
+* \S，操作系统的名称
+* \v，操作系统的版本
+
+还可以编辑/etc/motd来在用户登录后显示提示信息。
+
+三、bash的环境配置文件：因为配置文件的存在我们进入bash的时候不用每次都进行环境的配置。首先我们需要了解login shell和non-login shell的区别，关键在于有没有进行完整的登录流程（例如按CtrlAltF2在tty登录需要输入账号密码是login shell，而在X Window登录后打开的终端不需要输入账号密码是non-login shell，在bash中再执行bash也是non-login）。
+
+login shell读取的配置有`/etc/profile`和`~/.bash_profile或~/.bash_login或~/.profile`。前者是系统整体的配置，可以利用UID来确定很多的变量数据例如PATH、USER、MAIL等，还会依次调用/etc/inputrc、/etc/profile.d/*.sh等配置；后者是用户个人配置，bash只会按顺序读取存在的第一个文件。修改完配置文件后一般要重新login才能应用修改，不过也可以使用`source ~/.profile`或`. ~/.profile`来立刻读入配置。non-login shell 会读取`~/.bashrc`。不过zsh配置似乎没有这么多。
+
+此外，还可以用`stty`和`set`来对终端机进行设置（一般不用自行修改），`stty -a`和`echo $-`查看stty和set的所有配置。
+
+四、通配符与特殊符号：常用的通配符有：
+* `*`，代表0到任意多个字符
+* `?`，代表一定有一个任意字符
+* `[]`，代表一定有一个在中括号内的字符
+* `[ - ]`，代表在减号两侧字符编码顺序内的所有字符，如[0-9]
+* `[^ ]`，代表非括号内的任意字符
+
+### 数据流重定向
+Linux下标准输入stdin的代码为0，使用`<`或`<<`；标准输出stdout的代码为1，使用`>`或`>>`（覆盖或追加）；标准错误输出stderr的代码为2，使用`2>`或`2>>`。
+
+stdout与stderror：
+```bash
+# 假设我们是普通用户wallace要在/home目录下搜索文件myFile
+# 由于不具有其他用户主目录的访问权限所以我们会得到一些错误信息
+# 默认情况下stdout和stderr都是屏幕，现在我们将二者重定向到两个文件中
+find /home -name myFile > ~/list_right 2> list_error
+
+# /dev/null是一个垃圾桶黑洞设备，会将所有导向这个设备的信息吃掉，可以用于忽略错误信息。
+find /home -name myFile 2> /dev/null # 只有正确信息会显示到屏幕上
+
+# 如果要将正确和错误信息同时写入到一个文件中可以使用&>或者2>&1
+find /home -name myFile &> list
+find /home -name myFile > list 2>&1
+```
+stdin：
+```bash
+# <代表将原本需要键盘输入的数据用文件内容来替代
+cat > catfile < ~/.bashrc # 输入为.bashrc，cat的结果不会输出到屏幕而是catfile
+
+# <<代表指定结束输入的关键字
+cat > catfile << "eof" # 接下来在键盘输入内容，输入eof就结束输入而不需要按下ctrl+d，有助于编写程序
 ```
