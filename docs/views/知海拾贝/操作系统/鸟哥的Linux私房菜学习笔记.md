@@ -1207,6 +1207,8 @@ login shell读取的配置有`/etc/profile`和`~/.bash_profile或~/.bash_login�
 * `[^ ]`，代表非括号内的任意字符
 
 ### 数据流重定向
+一、什么是数据流重定向
+
 Linux下标准输入stdin的代码为0，使用`<`或`<<`；标准输出stdout的代码为1，使用`>`或`>>`（覆盖或追加）；标准错误输出stderr的代码为2，使用`2>`或`2>>`。
 
 stdout与stderror：
@@ -1231,3 +1233,218 @@ cat > catfile < ~/.bashrc # 输入为.bashrc，cat的结果不会输出到屏幕
 # <<代表指定结束输入的关键字
 cat > catfile << "eof" # 接下来在键盘输入内容，输入eof就结束输入而不需要按下ctrl+d，有助于编写程序
 ```
+
+二、命令执行的判断依据; , && ||
+
+在某些情况下我们想一次执行多条命令，这时我们可以使用shell script或者使用下面的符号来控制：
+* `COMMAND1;COMMAND2`，这个在前面也提到过，用分号分隔两条命令，不考虑命令的相关性依次执行。
+* `COMMAND1 && COMMAND2`，COMMAND1成功执行（True，回传码$? == 0）则执行COMMAND2，COMMAND1执行错误（False，回传码不等于0）则不执行COMMAND2。
+* `COMMAND1 || COMMAND2`，COMMAND1成功执行则无需执行COMMAND2，COMMAND1执行错误才执行COMMAND2。上面这两条类似于编程语言中的短路机制。
+
+示例1：不清楚/tmp/abc目录是否存在，但是最终一定要创建/tmp/abc/test这个文件
+```bash
+ls /tmp/abc || mkdir /tmp/abc && touch /tmp/abc/test
+# 如果该目录存在即（真||？）第二条命令不执行，真值继续向后传递（真&&？）第三条命令需要执行
+# 如果该目录不存在即（假||？）第二条命令执行，执行成功回传真（真&&？）第三条命令需要执行
+```
+示例2：要使得COMMAND1执行成功时则执行COMMAND2，否则执行COMMAND3。通常COMMAND2和COMMAND3都一定能执行成功。
+```bash
+COMMAND1 && COMMAND2 || COMMAND3 # 顺序不能错
+```
+
+### 管道命令
+管道符号`|`仅能够将前面的命令传来的正确信息（stdout）用作后一个命令的输入。每个管道后面接的第一个数据必定是命令，并且该命令必须要能够加收stdin的数据才行（例如less、more、head、tail），而cp、ls、mv这些命令并不会接受stdin的数据。
+
+一、选取命令：cut、grep
+
+cut命令可以将同一行里面的数据进行分解，`-d`选项指定divider（默认为Tab），`-f`选项指定要取的第几个field，例如看起来可能让人觉得眼花缭乱的$PATH：
+```bash
+# 取出由冒号分割的第三段和第五段
+➜  ~ echo $PATH | cut -d ':' -f 3,5 
+/usr/local/rvm/rubies/ruby-2.7.0/bin:/root/perl5/bin
+➜  ~ echo $PATH | cut -d ':' -f 3  
+/usr/local/rvm/rubies/ruby-2.7.0/bin
+➜  ~ echo $PATH | cut -d ':' -f 5
+/root/perl5/bin
+
+# 取得export命令输出的信息每行第12个字符后的所有字符串
+export | cut -c 12- # -c选项表示以Character为单位取出固定字符区间，如12-20 或 12- 或 -20
+```
+
+grep的作用是分析一行的信息，若当中有我们所需要的信息就将该行拿出来。其语法为`grep [-acinv] [--color=auto] '查找字符串' inputFileName`，grep可以单独使用，如果放在管道符后使用就不需要输入文件名了，也支持使用正则表达式进行搜索。各选项的含义为：
+* -a，将二进制文件当作文本文件来查找数据
+* -c，--count，计算找到'查找字符串'的次数
+* -i，--ignore-case，忽略大小写的不同
+* -n，顺便输出行号
+* -v，--invert-match，反向选择没有查找字符串的行
+* --color=auto，将找到的关键字加上颜色显示
+
+二、排序命令：sort、wc、uniq
+
+`sort`这个命令可以依据不同的数据类型来对行进行排序。用法为`sort [-fbMnrtuk] [file or stdin]`，常用的选项有：
+* -f，--ignore-case，忽略大小写的差异
+* -b，--ignore-leading-blanks，忽略最前面的空格部分
+* -M，以月份的名字（`(unkoown)<JAN<...<DEC`）来排序
+* -n，使用纯数字进行排序（默认使用字典序进行排序）
+* -r，--reverse，反向排序
+* -u，--unique，相同数据中仅出现一行代表
+* -t，--field-separator=SEP，使用指定分隔符（默认为Tab）
+* -k，--key=KEYDEF，以哪个区间为key来进行排序
+
+示例：
+```bash
+# 将/etc/passwd的内容取出并按照冒号分隔的第三列进行排序
+➜  ~ cat /etc/passwd | sort -t ':' -k 3 # 默认按照字典序排序，如果需要按照数字排序需要加上-n
+root:x:0:0:root:/root:/bin/zsh
+wallace:x:1000:1000:wallace:/home/wallace:/bin/bash
+qemu:x:107:107:qemu user:/:/sbin/nologin
+operator:x:11:0:operator:/root:/sbin/nologin
+
+# 将last命令得到的登录历史的第一列（帐号）取出并加以排序
+➜  ~ last | cut -d ' ' -f 1 | sort  
+
+reboot
+reboot
+root
+```
+
+如果排序完成了想要将重复的数据仅列出一行显示，可以使用`uniq`命令，注意要在排序后使用uniq否则只会统计相邻且相同的行的出现次数。使用-i选项可以忽略大小写的不同、使用-c选项可以统计相同行出现的次数，示例：
+```bash
+# 想要根据用户、登录终端类型和用户地址的不同排序并统计次数，而不用管后面的登录时间
+➜  ~ last | cut -c -38 | sort | uniq -c
+      1 
+     13 reboot   system boot  3.10.0-1127.10.1
+     21 reboot   system boot  3.10.0-1127.19.1
+      3 reboot   system boot  3.10.0-1127.el7.
+      1 root     :0           :0              
+      1 root     pts/0        :0              
+      1 root     pts/0        192.168.0.8     
+     14 root     pts/0        gateway         
+      1 root     pts/1        192.168.0.8     
+      7 root     pts/1        gateway         
+      5 root     pts/2        gateway         
+      3 root     pts/3        gateway         
+      3 root     pts/4        gateway         
+      3 root     pts/5        gateway         
+      3 root     pts/6        gateway         
+      3 root     pts/7        gateway         
+      3 root     pts/8        gateway         
+      3 root     pts/9        gateway         
+      3 root     tty2                         
+     27 wallace  :0           :0              
+     31 wallace  pts/0        :0              
+      7 wallace  pts/1        :0              
+      1 wallace  pts/1        gateway         
+      1 wallace  pts/2        :0              
+      1 wallace  tty2                         
+      1 wtmp begins Fri Jun 19 21:45:32 2020
+```
+使用`wc`（word counts）命令可以统计输入数据中有多少行、多少词、多少字符，默认输出三个数字代表前者。常用选项有：
+* -l，--lines，仅显示行数
+* -w，--words，仅显示单词数
+* -m，--chars，仅显示字符数
+* -c，--bytes，仅显示字节数
+
+示例：
+```bash
+# 在上面的例子中，last的输出中有一个空行，同时有一个非正常帐号wtmp，现在需要统计记录总共的登录人次
+➜  ~ last | cut -d ' ' -f 1 | grep '[a-zA-Z]' | grep -v 'wtmp' | wc -l
+159
+```
+
+三、双向流重定向`tee`：该命令可以从stdin中读入数据，并在原封不动的输出到stdout的同时将数据输出到指定文件中，可以用作记录中间暂存数据。选项有-a（--append）追加到文件中，-i（--ignore-interrupts）忽略中断信号。
+```bash
+# 将last的结果存一份到文件last.list中再交由cut处理后输出到屏幕
+last | tee -a last.list | cut -d '' -f 1
+```
+
+四、字符转换命令tr、col、join、paste、expand
+
+`tr`：translate or delete characters，可以用来删除一段信息中的文字，或者进行文字信息的转换。用法为`tr [-ds] 字符集1 ...`，字符集就是正则表达式中的字符集格式。示例：
+```bash
+# 将last输出的信息中所有小写字符转换为大写字符
+➜  ~ last | tr '[a-z]' '[A-Z]'
+
+# 将读取$PATH输出的信息中的冒号删除
+➜  ~ echo $PATH | tr -d ':'      
+/usr/local/rvm/gems/ruby-2.7.0/bin/usr/local/rvm/gems/ruby-2.7.0@global/bin/usr/local/rvm/rubies/ruby-2.7.0/bin/usr/lib64/qt-3.3/bin/root/perl5/bin/usr/local/sbin/usr/local/bin/sbin/bin/usr/sbin/usr/bin/root/bin/usr/local/rvm/bin
+
+# 将/etc/passwd转存到/root/passwddos文件中并将line separator改为DOS风格（CRLF）
+➜  ~ cat /etc/passwd | tr '\n' '\r\n' > /root/passwddos 
+➜  ~ file /etc/passwd ./passwddos 
+/etc/passwd: ASCII text
+./passwddos: ASCII text, with CR line terminators
+```
+
+`col`：可用于简单处理Tab和空格之间的转换（但我个人感觉`tr '\t' ' '`也能做到并且更好记一点）。
+
+`join`：join可以将两个文件当中有相同数据的行合并到一起，参数有：
+* -t，和sort一样，指定分隔符
+* -i，忽略大小写区别
+* -1 n，第一个文件用第n个字段作为key
+* -2 n，第二个文件用第n个字段作为key
+
+在我个人看来更像是类似于按照数据库的key进行连表操作（数据库中表的连接也成为join），假如我们要处理两个文件：
+```bash
+# 两个文件分别以uid为主键记录了一些指标
+➜  ~ cat file1                         
+id1:wallace:male
+id2:tony:male
+id5:kale:male
+➜  ~ cat file2
+id1:16:20KG
+id1:17:21KG
+id3:18:21KG
+id4:23:17KG
+id5:24:33KG
+
+# 现在要以两个文件的第一列为key连接两个文件
+➜  ~ join -t ':' file1 file2 # 默认以第一个字段为key
+id1:wallace:male:16:20KG
+id1:wallace:male:17:21KG
+id5:kale:male:24:33KG
+
+# 分别指定两个文件的key
+➜  ~ join -t ':' -1 4 /etc/passwd -2 3 /etc/group
+0:root:x:0:root:/root:/bin/zsh:root:x:
+1:bin:x:1:bin:/bin:/sbin/nologin:bin:x:
+2:daemon:x:2:daemon:/sbin:/sbin/nologin:daemon:x:
+4:adm:x:3:adm:/var/adm:/sbin/nologin:adm:x:
+join: /etc/passwd:6: is not sorted: sync:x:5:0:sync:/sbin:/bin/sync # 值得注意的是文件要事先按照key排序否则有些信息会被略过
+7:lp:x:4:lp:/var/spool/lpd:/sbin/nologin:lp:x:
+join: /etc/group:11: is not sorted: wheel:x:10:wallace
+99:nobody:x:99:Nobody:/:/sbin/nologin:nobody:x:
+65:pegasus:x:66:tog-pegasus OpenPegasus WBEM/CIM services:/var/lib/Pegasus:/sbin/nologin:pegasus:x:
+```
+
+`paste`：和join相比，paste只是简单地将文件每行之间粘贴在一起并用Tab分隔而已。不过join只能处理两个文件，paste可以处理多个文件或stdin，例如：
+```bash
+# 将/etc/group读出然后与/etc/passwd /etc/shadow粘贴在一起，最后取出前三行
+➜  ~ cat /etc/group | paste /etc/passwd /etc/shadow - | head -n 3 # 注意paste最后的“-”，会被当做stdin/stdout
+```
+
+`expand`的作用是将Tab用一定数量的空格替换（默认为8个空格，可以使用-t选项指定空格的个数）
+
+五、切割命令`split`：split命令可以将一份stdin数据分割成多个文件，用法为`split [-bl] file PREFIX`，-b选项指定单个分割的大小如300k/20m，-l选项指定按行数来切割，PREFIX是分割后文件名的前缀（前缀后会自动加上aa,ab,ac,...这样的后缀）。示例：
+```bash
+# 将文件myfile分割为300kb大小的小文件
+split -b 300k ./myfile splitfile
+# 将这些文件再合成一个文件
+cat splitfile* >> myfile
+# 将ls命令的结果每10行记录成一个文件
+ls -la / | split -l 10 - lsroot
+``
+
+六、参数代换`xargs`：该命令可以读入stdin的数据并以空格符或者断行字符进行分辨，将数据分割成arguments传递给后面的命令执行。由于很多命令不支持管道命令，xargs可以在该命令和stdin之间架起桥梁。示例：
+```bash
+# finger命令可以查询用户帐号的相关说明（可能需要用yum安装一下）
+# 我们取出/etc/passwd前三行第一列的用户名再作为参数交给finger查询
+# 先用cut选列还是先用head选行都可以
+head /etc/passwd -n 3 | cut -d ':' -f 1 | xargs finger
+cut -d ':' -f 1 /etc/passwd | head -n 3 | xargs finger
+```
+xargs还可以使用以下选项：
+* -0，将含有的特殊字符还原成一般字符
+* -e'eof'，后接指定的eof（没有空格），分析到该字符串就停止处理
+* -p，处理每个参数都要询问用户
+* -n，后接每次command命令执行时要使用几个参数
