@@ -1448,3 +1448,74 @@ xargs还可以使用以下选项：
 * -e'eof'，后接指定的eof（没有空格），分析到该字符串就停止处理
 * -p，处理每个参数都要询问用户
 * -n，后接每次command命令执行时要使用几个参数
+
+## 第12章 正则表达式与文件格式化处理
+正则表达式是一种表示方法，可以理解为以行为单位来进行字符串的处理行为，通过一些特殊符号的辅助，可以让用户轻易达到查找、删除、替换某特定字符串的目的。vi、grep、awk、sed等工具支持正则表达式，而cp、ls等命令没有支持正则表达式只能使用bash自身的通配符。
+
+> 感觉这部分鸟哥更多是举例子，没有高淇老师讲得系统，所以下面只是列举用法，想要系统学习的话可以看高淇老师的Java300集中对应的那几节。
+
+首先我们需要了解一些特殊符号（其实是自定义字符集）：
+* `[:digit:]`，代表0~9
+* `[:alnum:]`，26个字母的大小写和数字
+* `[:alpha:]`，26个字母的大小写
+* `[:lower:]`，代表26个小写字母
+* `[:upper:]`，代表26个大写字母
+* `[:blank:]`，空格与Tab键
+* `[:graph:]`，代表除空格和Tab外其他的所有按键
+* `[:cntrl:]`，代表控制按键包括CR、LF、Tab、Del等
+* `[:print:]`，代表任何可以被打印出来的字符
+* `[:punct:]`，代表标点符号，即`"'?!;:#$`
+* `[:space:]`，任何会产生空白的字符例如空格、Tab、CR等
+* `[:xdigit:]`，代表16进制数0~9、a~f、A~F
+
+### 基础正则表达式
+grep可以后接-A（--after-context=NUM）或-B（--before-context=NUM）来指定找到显示关键字所在行的后n行和前n行。下面通过示例来说明如何在grep中使用正则表达式：
+```bash
+# 1.查找特定字符串
+# 在文件regular_express.txt中查找有“the”的行并显示行号
+grep -n 'the' regular_express.txt
+# 反向查找，即查找没有“the”的行
+grep -nv 'the' regular_express.txt
+# 查找有“the”的行，不论大小写
+grep -ni 'the' regular_express.txt
+
+# 2.用[]来查找字符集
+# 查找有“test”或taste的行
+grep -n 't[ae]st' regular_express.txt # 其实这样不是很严谨，找的是test或tast
+# 查找含有“oo”但“oo”之前不是“g”的行
+# 中括号里第一个字符是“^”表示对该自定义字符集反向选择，不能出现其中的字符
+grep -n '[^g]oo' regular_express.txt # 一行同时出现满足和不满足的也会被找出
+# 找出包含“oo”前的字符不是小写字符的行
+grep -n '[^[:lower:]]oo' regular_express.txt
+grep -n '[^a-z]oo' regular_express.txt
+
+# 3.行首与行尾字符^$
+# 查找行首是小写字符的行
+grep -n '^[a-z]' regular_express.txt
+grep -n '^[[:lower:]]' regular_express.txt
+# 查找行尾是“.”的行
+grep -n '\.$' regular_express.txt # 点号表示任意一个字符，需要转义，如果是CRLF换行符会找不到
+# 查找空白行
+grep -n '^$' regular_express.txt   
+
+# 4.任一字符.和重复字符*
+# 查找有g和d之间有两个任意字符的行
+grep -n 'g..d' regular_express.txt
+# 查找含有以“g”和“g”开头和结尾的字符串的行
+grep -n 'g.*g' regular_express.txt
+
+# 5.使用量词{}
+# 查找含有连续两个o的字符串的行
+grep -n 'o\{2\}' regular_express.txt # 由于在shell中大括号有特殊意义所以需要转义
+# 查找以g开头结尾并且中间有且仅由2~5个o的字符串
+grep -n 'go\{2,5\}g' regular_express.txt
+# 查找以g开头结尾并且中间有且仅由2个以上的o构成字符串
+grep -n 'go\{2,\}g' regular_express.txt
+```
+
+练习：找出/etc/下文件类型为连接文件的文件名：
+```bash
+# 没法用分隔符分割，我数了一下，ls的结果从49个字符开始是文件名
+➜  ~ ls -l /etc | grep '^l' | cut -c 49- 
+extlinux.conf -> ../boot/extlinux/extlinux.conf
+```
