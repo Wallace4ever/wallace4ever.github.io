@@ -1496,7 +1496,7 @@ grep -n '^[[:lower:]]' regular_express.txt
 # 查找行尾是“.”的行
 grep -n '\.$' regular_express.txt # 点号表示任意一个字符，需要转义，如果是CRLF换行符会找不到
 # 查找空白行
-grep -n '^$' regular_express.txt   
+grep -n '^$' regular_express.txt
 
 # 4.任一字符.和重复字符*
 # 查找有g和d之间有两个任意字符的行
@@ -1519,3 +1519,97 @@ grep -n 'go\{2,\}g' regular_express.txt
 ➜  ~ ls -l /etc | grep '^l' | cut -c 49- 
 extlinux.conf -> ../boot/extlinux/extlinux.conf
 ```
+
+**sed工具**
+
+sed（stream editor）流编辑器是一个强大的工具，可以用于将数据进行替换、删除、新增选取特定行等功能，可以处理stdin。sed的参数除了选项还有动作，用法为`sed [OPTION] 'SCRIPT' [stdin]`。常用的选项有：
+* -n，--quiet，--silent，使用安静模式只输出经过处理的行（默认输出所有行）
+* -e SCRIPT，--expression=SCRIPT，在命令行模式上进行sed的动作编辑（没有-e其实也行）
+* -f SCRIPT-FILE，--file=SCRIPT-FILE，执行写入到文件中的动作
+* -r，--regexp-extended，让sed支持扩展正则表达式（默认仅支持基础正则表达式语法）
+* -i SUFFIX，--in-place=SUFFIX，直接修改读取文件的内容而不是由屏幕输出
+
+选项后还要接上动作`[n1[,n2]] function`，n1和n2可选，表示后面的function动作要在那些行之间进行，动作需要用单引号括起来。常用的function有：
+* a，新增，a后接字符串，这些字符串会在当前行的下一行出现
+* i，插入，i后接字符串，这些字符串会在当前行的上一行出现
+* c，替换，c后接字符串，这些字符串会替换n1和n2之间的行
+* d，删除
+* p，打印，将选择的数据打印出来
+* s，替换，格式为s/regexp/replacement/g
+
+看理论不好理解，我们看一组示例：
+```bash
+# 1. 将/etc/passwd的内容连同行号输出，同时删除2~5行
+➜  ~ nl /etc/passwd | sed '2,5d' # 只删除第二行'2d' 删除第二行到最后一行'2,$d'
+     1	root:x:0:0:root:/root:/bin/zsh
+     6	sync:x:5:0:sync:/sbin:/bin/sync
+     7	shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown 
+
+# 2. 将/etc/passwd的内容连同行号输出，同时在第2~3行每行后追加一行“drink tea”
+➜  ~ nl /etc/passwd | sed '2,3a drink tea' # 范围参数同上，如果要在每行前插入的话将a改为i即可，如果要插入多行可以用反斜线转义回车
+➜  ~ nl /etc/passwd | sed '2,5a drink tea'
+     1	root:x:0:0:root:/root:/bin/zsh
+     2	bin:x:1:1:bin:/bin:/sbin/nologin
+drink tea
+     3	daemon:x:2:2:daemon:/sbin:/sbin/nologin
+drink tea
+     4	adm:x:3:4:adm:/var/adm:/sbin/nologin
+     5	lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+
+# 3. 将第2~5行的内容替换为hello world
+➜  ~ nl /etc/passwd | sed '2,5c hello world'
+     1	root:x:0:0:root:/root:/bin/zsh
+hello world
+     6	sync:x:5:0:sync:/sbin:/bin/sync
+
+# 4. 仅列出文件的第5~7行
+➜  ~ sed -n '5,7p' /etc/passwd # 如果不使用-n选项，默认全部输出，并且在5~7行会重复输出一次
+
+# 5. 使用正则表达式在行内搜索对应的pattern并予以替换
+# 例如从ifconfig的输出中找到网卡的IPv4地址所在的行
+➜  ~ ifconfig enp0s3 | grep 'inet '
+        inet 10.0.2.15  netmask 255.255.255.0  broadcast 10.0.2.255
+# 接下来要使用正则表达式两ip地址前的内容删掉（替换为空字符）
+➜  ~ ifconfig enp0s3 | grep 'inet ' | sed 's/^.*inet //g'
+10.0.2.15  netmask 255.255.255.0  broadcast 10.0.2.255
+# 再将ip地址后的内容删除
+➜  ~ ifconfig enp0s3 | grep 'inet ' | sed 's/^.*inet // g' | sed 's/ netmask.*$//g'
+10.0.2.15 
+
+# 7. 综合练习：查看/etc/man_db.conf的内容中含有“MAN”的行，但不显示批注
+# 鸟哥给的解法是cat读出->grep找到有“MAN”的行->用sed将含有注释的行替换为空行->用sed删除空行
+➜  ~ cat /etc/man_db.conf | grep 'MAN' | sed 's/^#.*$//g' | sed '/^$/d'
+# 也可以先用sed将含有注释的行替换为空行，再用grep找到有“MAN”的行
+➜  ~ sed 's/^#.*$//g' /etc/man_db.conf | grep 'MAN' 
+# 其实这个需求直接用grep就能实现了
+➜  ~ grep -v '#' /etc/man_db.conf | grep 'MAN'  
+MANDATORY_MANPATH			/usr/man
+MANDATORY_MANPATH			/usr/share/man
+MANDATORY_MANPATH			/usr/local/share/man
+（省略）
+
+# 8. 用sed直接修改文件内容而非使用stdout
+# 将regular_express.txt每行结尾的点号替换成感叹号
+➜  ~ sed -i 's/\.$/\!/g' regular_express.txt  
+# 在该文件的最后一行追加一行“# This is a test.”
+➜  ~ sed -i '$a # This is a test.' regular_express.txt 
+# 不打开vim或者gedit编辑器，在一个100万行的文件myFile.csv的第10000行后插入一行“100,120,130”
+➜  ~ sed -i '10000a 100,120,130' myData.csv
+```
+
+### 扩展正则表达式
+扩展正则表达式能够简化某些场景下基础正则表达式的写法。例如，原来我们要使用grep剔除注释和空行后显示文件内容需要用两次grep：
+```bash
+grep -v '^$' file.txt | grep -v '^#'
+```
+使用扩展正则表达式可以简化为：
+```bash
+# grep -E启用扩展正则支持；或直接使用egrep
+grep -vE '^$|^#' file.txt # 扩展正则表达式可以通过|实现分组功能
+```
+扩展正则表达式的字符有：
+* +，表示前一个字符至少出现1次，至多无数次
+* ?，前一个字符出现0次或1次
+* |，用或的逻辑找出多个字符串
+* ()，捕获组。后面可以接量词，括号内表示一个整体。括号内也可以使用“或”并将公共的字符放在括号两侧。
+
