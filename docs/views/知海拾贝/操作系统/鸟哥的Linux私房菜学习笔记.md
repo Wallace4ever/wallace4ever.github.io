@@ -1613,3 +1613,115 @@ grep -vE '^$|^#' file.txt # 扩展正则表达式可以通过|实现分组功能
 * |，用或的逻辑找出多个字符串
 * ()，捕获组。后面可以接量词，括号内表示一个整体。括号内也可以使用“或”并将公共的字符放在括号两侧。
 
+### 文件的格式化与相关处理
+
+一、格式化打印printf：后面提到的awk以及c语言中都是利用printf进行。使用的格式为`printf '打印格式' 实际内容`，一些特殊的格式有：
+* \a，alert，警告声音
+* \b，backspace，退格
+* \f，from feed，清除屏幕
+* \n，new line，输出新的一行
+* \r，return，回车键
+* \t，tab键
+* \v，垂直的tab键
+* \xNN，输出十六进制数NN代表的字符
+
+```bash
+# 示例：从文本中读出每一行的数据并尝试按照打印格式打印出来
+# 格式化字符串中的空格也会被打印
+➜  ~ printf '%10s %5i %5i %5i %8.2f \n' `cat printf.txt`                  
+# 这一行是表格的标题，由于后面都不能被格式化为数值所以显示都是0，可以过滤掉：`cat printf.txt | grep -v 'Name'`
+      Name     0     0     0     0.00  
+    DmTsai    80    60    92    77.33 
+     Vbird    75    55    80    70.00 
+       Ken    60    90    70    73.33 
+```
+
+二、awk：好用的数据处理工具
+
+awk的格式为：`awk '条件类型1{动作1} 条件类型2{动作2} ...' 文件名`，awk以一行为一次处理的单位，以字段为最小处理的单位（字段之间以空格或Tab隔开）。awk最常用的动作是通过print的功能将字段数据列出来，我们举个例子：
+```bash
+# 使用last查看最近的系统登录记录
+➜  ~ last -n 5                
+wallace  pts/0        :0               Mon Nov 23 10:22   still logged in   
+wallace  :0           :0               Mon Nov 23 10:22   still logged in   
+reboot   system boot  3.10.0-1160.2.2. Mon Nov 23 10:21 - 16:57  (06:35)    
+wallace  pts/0        :0               Fri Nov 20 16:02 - 20:31  (04:28)    
+wallace  :0           :0               Fri Nov 20 16:02 - down   (04:28)  
+# 在前面的基础上取出第一列和第三列
+➜  ~ last -n 5 | awk '{print $1 "\t" $3}' # awk后的动作是以单引号括住的，里面的格式化字符串用双引号
+wallace	:0
+wallace	:0
+reboot	boot # 能看到由于默认用空格或Tab区分fields，所以这里没有取到预想的部分
+wallace	:0
+wallace	:0
+```
+awk中也内置了一些**相关的变量**，例如`NF`（Number of fields，每一行拥有的字段）、`NR`（Number of input records so far，目前已处理的行数）、`FS`（Field Separator，字段分隔符，默认是空格），例如显示当前处理到哪一行以及当前行有多少列：
+```bash
+# 源数据
+➜  ~ last -n 5 | sed '6,7d'                                                   
+wallace  pts/0        :0               Mon Nov 23 10:22   still logged in   
+wallace  :0           :0               Mon Nov 23 10:22   still logged in   
+reboot   system boot  3.10.0-1160.2.2. Mon Nov 23 10:21 - 20:04  (09:43)    
+wallace  pts/0        :0               Fri Nov 20 16:02 - 20:31  (04:28)    
+wallace  :0           :0               Fri Nov 20 16:02 - down   (04:28)  
+# 使用awk处理
+➜  ~ last -n 5 | sed '6,7d' | awk '{print $1 "\tlines: " NR "\tcolumns: " NF}'
+wallace	lines: 1	columns: 10
+wallace	lines: 2	columns: 10
+reboot	lines: 3	columns: 11
+wallace	lines: 4	columns: 10
+wallace	lines: 5	columns: 10
+```
+例子2：
+```bash
+# 从/etc/passwd中找出第三个字段代表的uid小于10的用户，并且仅打印还用户的用户名和uid
+➜  ~ cat /etc/passwd | awk 'BEGIN {FS=":"} $3 < 10 {print $1 "\t" $3}'
+root	0
+bin	1
+daemon	2
+adm	3
+lp	4
+sync	5
+shutdown	6
+halt	7
+mail	8
+```
+
+例子3：
+```bash
+# 我们用vim创建这样的一个文件
+➜  ~ cat pay.txt
+Name	1st		2nd		3th
+Vbird	23000	24000	25000
+DMtsai	21000	20000	23000
+Wallace	43000	42000	41000
+# 使用awk处理，如果是第一行就打印相应的标题，如果行数大于等于2就计算第2~4字段的总和并一并打印出来
+➜  ~ cat pay.txt | awk 'NR==1{printf "%10s %10s %10s %10s %10s\n",$1,$2,$3,$4,"Total"} NR>=2{total = $2 + $3 + $4; printf "%10s %10d %10d %10d %10.2f\n",$1,$2,$3,$4,total}'
+# 上面的第二个动作中涉及了两个行为：变量赋值和printf，需要用封号隔开，也可以用回车
+      Name        1st        2nd        3th      Total
+     Vbird      23000      24000      25000   72000.00
+    DMtsai      21000      20000      23000   64000.00
+   Wallace      43000      42000      41000  126000.00
+```
+awk的功能非常强大丰富，我们暂时只了解到这里。
+
+三、文件比较工具
+
+`diff`一般用于ASCII纯文本文件的比较（也可以用于比较两个目录），并且以行为比较单位。用法为`diff [-bBi] from-file to-file`，两个文件之一可以用`-`代替来代表stdin，选项有：
+* -b，忽略一行中多个空白的区别，如`hello world`和`hello   world`视为相同
+* -B，忽略空白行的区别
+* -i，忽略大小写的区别
+
+`cmp`一般用于以字节为比较单位去比较两个文件，用法和diff类似，选项有-s用于将所有不同点的字节处都列出来（默认只会输出第一个不同点的位置）。
+
+`patch`工具可以将diff工具产生的patch文件作为补丁打到旧文件上去，例如：
+```bash
+# 使用diff比较两个文件并制作patch文件
+diff -Naur password.old password.new > paswword.patch
+# 使用patch来更新旧版数据
+patch -p0 < password.patch # -p后面的数字表示要减去几层目录，在整体比较目录时该数字一般大于0
+# 使用patch来回复旧文件的内容
+patch -R -p0 < password.patch # -R表示恢复文件
+```
+
+此外，可以在打印文件前用`pr`（convert text files for printing）来进行格式预处理，例如加入页面标题等等。
