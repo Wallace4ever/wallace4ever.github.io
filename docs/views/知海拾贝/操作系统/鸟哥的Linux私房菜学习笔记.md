@@ -1725,3 +1725,99 @@ patch -R -p0 < password.patch # -R表示恢复文件
 ```
 
 此外，可以在打印文件前用`pr`（convert text files for printing）来进行格式预处理，例如加入页面标题等等。
+
+## 第13章 学习shell script
+shell script可以跨平台运行，语法相当亲和，用处很多：
+* 帮助系统管理员进行自动化管理，例如查询登陆文件、追踪流量、、监控用户使用主机状态、监控硬件设备状态等。
+* 检查对应的shell script可以用于追踪管理系统时出现的问题。
+* 可以编写shell script以实现简单的入侵检测功能，并立即通报管理员或者加强防火墙的设置规则。
+* 将一连串连续的命令单一化（本博客下的deploy.sh就是这样的一个脚本）。
+* 进行简易的数据处理（处理大量数值运算时速度就不如传统的编程语言了）。
+
+编写及运行shell script的一些注意事项：
+* 脚本是逐行解释执行的，空白行会被忽略，多个空格和Tab都会被视为一个空格，如果读到一个换行则尝试执行该行的命令，可以用`\Enter`扩展至下一行。
+* 使用路径执行脚本：该脚本必须有rx权限，这时可以用绝对路径`/absPath/myScript.sh`、相对路径`./myScript.sh`或者将脚本放入$PATH指定的目录下。
+* 使用bash命令执行脚本：该脚本只需要r权限即可，通过`sh或bash 脚本的绝对或相对路径`即可在执行该脚本，这种方式还可以使用bash的一些选项来对脚本进行检查。
+* 使用`source myScript.sh`执行脚本，前面两种方式都是在一个新的bash子进程中执行，执行完毕后子进程的变量不会传回父进程中，而source则是直接在当前bash进程中执行，变量设置等操作会保持有效。
+
+我们要养成良好的shell script编写习惯：
+* 在每个脚本的头部记录好脚本的功能、版本信息、作者与联络方式、版权声明方式、历史记录
+* 脚本内较为特殊的命令使用绝对路径执行
+* 脚本执行时需要的环境变量要预先声明并设置
+* 最好能想Python中那样用Tab进行缩进排版，增加可读性。
+
+### 简单的shell script练习
+一、交互式脚本，变量由用户的输入决定。通过`read -p`实现交互式变量输入。
+```bash
+#!/bin/bash
+# Program:
+#	This program shows full name input by user.
+# History:
+# 2020/11/24 Wallace First Release
+PATH=$PATH:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+export PATH
+
+read -p "Please inout your first name:" firstname
+read -p "Please inout your last name:" lastname
+echo -e "Your full name is $firstname $lastname"
+exit 0
+```
+二、利用日期动态地创建不同文件名的文件。我们常常遇到这样的一种场景：想要自动记录某种特定的日志服务，将每天的内容记录到一个单独的文件中。我们希望文件名有一个统一的前缀用于表示文件内容，同时又希望文件名后面包含该文件对应的日期。
+```bash
+➜  scripts cat sh03.sh    
+#!/bin/bash
+# Program:
+#	This program create a series of files with same prefix while distincted by date.
+# History:
+# 2020/11/24 Wallace First Release
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+export PATH
+
+# 提示用户输入前缀
+echo -e "This program will use 'touch' command to create 3 files."
+read -p "Please input your file prefix:" file_prefix
+filename=${file_prefix:-"filename"} # 分析是否已经设置文件前缀
+
+# 获取三个时间并设置到变量中
+date1=$(date --date='2 days ago' +%Y%m%d)
+date2=$(date --date='1 days ago' +%Y%m%d)
+date3=$(date +%Y%m%d)
+# 将前缀和时间变量拼接成新变量
+file1=${filename}${date1}
+file2=${filename}${date2}
+file3=${filename}${date3}
+
+# 使用拼接后的文件名创建文件
+touch "$file1"
+touch "$file2"
+touch "$file3"
+```
+
+三、进行简单的整数四则运算、求余数运算
+```bash
+➜  scripts cat sh04.sh 
+#!/bin/bash
+# Program:
+#	This program does simple integer calculation.
+# History:
+# 2020/11/24 Wallace First Release
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+export PATH
+
+read -p "Input first integer to multiply:" number1
+read -p "Input second integer to multiply:" number2
+# 这里也可以使用declare -i total=$number1*$number2
+result=$(($number1*$number2)) # 乘号左右的空格可加可不加
+# 这里后面要直接加句点所以得用花括号区隔，否则花括号可以省略
+echo -e "Result of $number1 * $number2 is: ${result}."
+```
+`$((数值运算内容))`是一个常用的形式，建议使用这种方式：
+```bash
+➜  scripts echo 13%3 # 默认是作为字符串，加上引号也一样
+13%3
+➜  scripts echo $((13%3))
+1
+➜  scripts echo $(13%3)  # 13%3本身不是命令所以报错
+zsh: 13%3: command not found...
+zsh: command not found: 13%3
+```
