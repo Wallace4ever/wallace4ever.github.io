@@ -1821,3 +1821,167 @@ echo -e "Result of $number1 * $number2 is: ${result}."
 zsh: 13%3: command not found...
 zsh: command not found: 13%3
 ```
+
+### 善用判断式
+前面提到过使用`||`和`&&`可以根据前一条命令的回传码来确定后面的命令是否执行。在bash中我们还有很多可用于判断的方法。
+
+一、`test`命令可以用于测试很多条件是否成立，并且不会显示任何结果而是会根据结果返回不同的回传码。该工具可以检查很多东西，包括：
+
+**测试文件类型**
+* -e，该文件名是否存在（exist）
+* -f，该文件名是否存在且为regular file
+* -d，该文件名是否存在且为目录
+* -b，该文件名是否存在且为block device
+* -c，该文件名是否存在且为character device
+* -S，该文件名是否存在且为一个Socket文件
+* -p，该文件名是否存在且为一个pipe（FIFO）文件
+* -L，改文件名是否存在且为一个link file
+
+**测试文件权限（root权限常常有例外）**
+* -r，该文件是否存在并对该文件有可读权限
+* -w，该文件是否存在并对该文件有可写权限
+* -x，该文件是否存在并对该文件有可执行权限
+* -u，该文件是否存在并有SUID属性
+* -g，该文件是否存在并有SGID属性
+* -k，该文件是否存在并有Sticky bit属性
+* -s，该文件是否存在并且非空（size greater than zero）
+
+**测试比较两个文件的关系 如test file1 -nt file2**
+* -nt，一个文件的mtime比另一个文件的mtime更新（newer than）
+* -ot，一个文件的mtime比另一个文件的mtime更旧（older than）
+* -ef，两个文件名是否指向同一个inode。（equal file）
+
+**测试两个整数之间的关系 如test n1 -eq n2**
+* -eq，两数是否相等
+* -ne，两数是否不等
+* -gt，n1是否大于n2
+* -lt，n1是否小于n2
+* -ge，n1是否大于等于n2
+* -le，n1是否小于等于n2
+
+**测试字符串的属性**
+* -z，字符串长度是否为zero（空字符串）
+* -n，字符串是否为非空（空则为false，-n可以省略）
+* str1 = str2，测试两个字符串是否相等
+* str1 != str2，测试两个字符串是否不等
+
+**多重条件判定**
+* -a，（and）如`test -r file -a -x file`在文件同时可读可执行时回传true。
+* -o，（or）如`test -r file -o -x file`在文件可读或可执行时回传true。
+* ！，（not）如`test ! -x file`在文件不具有可执行权限时回传true。
+
+练习题：让用户输入一个文件名，我们要做到：
+1. 这个文件是否存在，若不存在则给予一个“Filename does not exist”的讯息，并中断程序；
+2. 若这个文件存在，则判断他是个文件或目录，结果输出“Filename is regular file”或“Filename is directory”
+3. 判断一下，执行者的身份对这个文件或目录所拥有的权限，并输出权限数据！
+
+我写的shell script如下：
+```bash
+#!/bin/bash
+# Program:
+#	This program use [test] command to print privileges.
+# History:
+# 2020/11/25 Wallace First Release
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+export PATH
+
+# test file type
+read -p "Input a file path:" targetFile
+test -e $targetFile || (echo "$targetFile does not exist."; exit 1) # 这边其实有一些逻辑问题
+test -f $targetFile && echo "$targetFile is a regular file."
+test -d $targetFile && echo "$targetFile is a directory."
+
+# test privileges
+echo "Your privileges for the file is:$(test -r $targetFile && echo 'r')$(test -w $targetFile && echo 'w')$(test -x $targetFile && echo 'x')"
+```
+执行脚本的结果如下：
+```bash
+# 当前目录下有一个普通文件和目录，当前用户root的权限也如下所示
+➜  scripts ll
+total 20K
+drwxr-xr-x. 2 root root   6 Nov 24 17:59 pp
+-rw-r--r--. 1 root root 626 Nov 25 16:13 sh05.sh
+➜  scripts sh sh05.sh
+Input a file path:pp
+pp is a directory.
+Your privileges for the file is:rwx
+➜  scripts sh sh05.sh
+Input a file path:./sh05.sh
+./sh05.sh is a regular file.
+Your privileges for the file is:rw
+➜  scripts sh sh05.sh
+Input a file path:/dummy
+/dummy does not exist. # 这之后并没有直接退出
+Your privileges for the file is:
+```
+可以看到当文件存在时的输出没有问题，不过在文件不存在时出了一些问题，在输出文件不存在后脚本没有执行exit 1结束，这个问题其实之前鸟哥提到过。我原来写的是：
+```bash
+test -e $targetFile || echo "$targetFile does not exist" || exit 1
+```
+该写法在文件存在的时候不会有问题，但是在文件不存在时输出文件不存在后回传码变为1就不会执行exit 1了，应该改写为：
+```bash
+test ! -e $targetFile && echo "$targetFile does not exist" && exit 1
+```
+另外我的脚本忘记了对用户的输入是否为空（即直接按下回车），如果用户直接按下回车结果也会出现问题，所以应该在用户输入后加入这一行：
+```bash
+test -z $targetFile && echo "You must input a correct file path!" && exit 1
+```
+
+二、使用判断符号`[]`
+
+我们可以使用中括号省略`test`这个命令名，例如要测试$HOME这个变量是否为空，我们可以使用：
+```bash
+test -z $HOME; echo $?
+[ -z "$HOME" ]; echo $?
+```
+在使用中括号时，有以下注意点：
+* 各元素间务必加上空格
+* 中括号内的变量需要用双引号括起来（如果不括起来，且变量中有空格存在时可能会被认为是多个参数）
+* 中括号内的常量需要用单引号或双引号括起来
+
+练习题，判断用户输入的是`y/Y`或`n/N`或是非标准的输入：
+```bash
+#!/bin/bash
+# Program:
+#	This program determins whether user input y/Y/n/N
+# History:
+# 2020/11/25 Wallace First Release
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+export PATH
+
+echo -e "Please input your choice: (y/Y/n/N)"
+read choice
+[ "$choice" == "y" -o "$choice" == "Y" ] && echo "Your choice is yes." && exit 0
+[ "$choice" == "n" -o "$choice" == "N" ] && echo "Your choice is no." && exit 0
+echo "Unrecognized choice" && exit 1
+```
+
+三、shell script的默认变量
+
+我们举个例子来说明：
+```bash
+#!/bin/bash
+# Program:
+#	This program uses the parameters of the script
+# History:
+# 2020/11/25 Wallace First Release
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+export PATH
+
+echo "The script name is $0" # 脚本的文件名
+echo "Total parameter number is $#" # 调用脚本时后接参数的个数
+[ "$#" -lt 2 ] && echo "Total parameter less than 2, exit." && exit 0
+echo "Your whole parameter is '$@'" # 全部参数
+echo "1st parameter: $1" # 第一个参数
+echo "2nd parameter: $2" # 第二个参数
+```
+执行结果：
+```bash
+➜  scripts sh sh07.sh one two three
+The script name is sh07.sh
+Total parameter number is 3
+Your whole parameter is 'one two three'
+1st parameter: one
+2nd parameter: two
+```
+我们可以在脚本中使用`shift n`来将参数左移n位，左移掉的参数等于“被吃掉了”。
