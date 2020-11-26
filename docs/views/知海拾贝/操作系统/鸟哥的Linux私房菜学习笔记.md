@@ -1822,7 +1822,7 @@ zsh: 13%3: command not found...
 zsh: command not found: 13%3
 ```
 
-### 善用判断式
+### 判断式`test`和`[]`
 前面提到过使用`||`和`&&`可以根据前一条命令的回传码来确定后面的命令是否执行。在bash中我们还有很多可用于判断的方法。
 
 一、`test`命令可以用于测试很多条件是否成立，并且不会显示任何结果而是会根据结果返回不同的回传码。该工具可以检查很多东西，包括：
@@ -1985,3 +1985,157 @@ Your whole parameter is 'one two three'
 2nd parameter: two
 ```
 我们可以在脚本中使用`shift n`来将参数左移n位，左移掉的参数等于“被吃掉了”。
+
+### 使用判断式作为流程控制条件
+一、if语句
+
+编程语言中都有最基本的流程控制，shell script也不例外，简单的if-then语句格式为：
+```bash
+if [ 判断式 ]; then
+    COMMANDS
+    ...
+fi
+```
+在一个`[]`判断式中我们可以通过-o或-a放入多个判断条件，也可以使用&&或者||连接多个`[]`。除了if-then语句，还有else和elif子句。
+```bash
+if [ 判断式 ]; then
+    COMMANDS
+elif [ 判断式 ]; then
+    COMMANDS
+else
+    COMMANDS
+fi
+```
+
+二、case语句
+
+常规编程语言中我们有switch-case语句，shell script中我们也可以根据变量的不同case选择不同的行为。
+```bash
+case $变量名 in 
+    "case1")
+    COMMANDS
+    ;;
+    "case2")
+    COMMANDS
+    ;;
+    * ) # 相当于其他语言中的default情况
+    COMMANDS
+    ;;
+esac    
+```
+例子：
+```bash
+case $1 in
+"hello")
+	echo "Hello there"
+	;;
+"")
+	echo "You must input parameters. example > {$0 someword}"
+	;;
+*)
+	echo "Incorrect params."
+	;;
+esac
+```
+
+三、while循环
+
+shell script中的while形式有两种：
+```bash
+# 当条件满足时循环执行动作
+while [ CONDITION ]
+do
+    COMMANDS
+done
+
+# 循环执行动作直到条件满足
+until [ CONDITION ]
+do
+    COMMANDS
+done
+```
+练习1：直到用户输入“yes”或“YES”才结束，否则在循环中不断提示用户输入正确的回答
+```bash
+while [ "$user_input" != "yes" -a "$user_input" != "YES" ]
+# until [ "$user_input" == "yes" -o "$user_input" == "YES" ]
+do
+	read -p "Please input yes/YES to exit:" user_input
+	echo $user_input
+done	
+echo "You have input the correct answer!"
+```
+练习2：用户输入一个正整数，计算1+2+...+n的结果并输出至屏幕。
+```bash
+declare -i total=0
+declare -i n=0
+declare -i i=1
+read -p "Enter the max limit:" n
+[ $n -lt 1 ] && echo "Not an positive integer!" && exit 1
+while [ $i -le $n ]
+do
+	total=$(( $total + $i ))
+	i=$(( $i + 1 ))
+done
+echo "The result is: $total"
+```
+
+四、for循环
+
+shell script中的for循环有两种形式，第一种类似于Python中的循环，或者Java8以后的增强for，需要提供一个变量的取值区间。
+```bash
+for var in con1 con2 con3 ...
+do
+    COMMANDS
+done
+```
+后面的condition可以是一连串的字符串，也可以是用cut等命令切出来的一列字符串或是ls列出的一批文件名（只要有空格、Tab、回车分割即可），例如：
+```bash
+# 例1，cut切割出所有的账户名
+users=$(cut -d ':' -f 1 /etc/passwd) 
+for username in $users
+do
+	id $username
+	finger $username
+done
+
+# 例2，ls列出的所有文件名
+dir=/root
+for filename in $(ls $dir)
+do
+    echo "Full path is $dir/$filename"
+done
+
+# 例3，seq生成数字序列
+network=192.168.0
+for host in $(seq 1 255)
+do
+    echo "The ip addr is ${network}.${host}"
+done
+```
+
+第二种for循环的形式只适用于整数变量，类似于Java7前的for循环。这种循环可以很方便的使用数值变量作为计数器，例如：
+```bash
+total=0
+limit=100
+for ((i=1; i<=$limit; i=i+1))
+do
+    total=$(($total + $i))
+done
+echo "Result of 1+2+...+limit is: $total"
+```
+
+五、用function定义函数
+
+由于shell script是脚本语言自上而下执行，所以想要使用函数得在前面先声明：
+```bash
+function myFunc(){
+    echo "First param of this function is : $1" # 函数里的$n是调用该函数时后接的参数，而不是脚本的参数。
+}
+```
+定义完毕后在脚本后面就可以将函数名当作一个普通命令一样去调用，并且可以添加若干参数。
+
+### shell script的追踪调试
+此外，`sh`命令本身具有一些检查调试相关的选项：
+* -n，不执行该script而是仅仅检查其语法问题。
+* -v，在执行某脚本前，先将脚本内容输出到屏幕上
+* -x，将script每一步的执行过程内容显示到屏幕上
