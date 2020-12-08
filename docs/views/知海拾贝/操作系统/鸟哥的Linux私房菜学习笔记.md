@@ -2256,5 +2256,21 @@ sudo -u wallace sh -c "COMMAND;COMMAND;..."
 root	ALL=(ALL) 	ALL
 # 加上百分号表示后面是一个用户组
 %wheel	ALL=(ALL)	ALL
+# 让用户无需输入自己的密码也可以执行sudo
+%wheel	ALL=(ALL)	NOPASSWD: ALL
+# 让指定用户可以修改他人密码，但不能修改root密码
+wallace ALL=(root)  !/usr/bin/passwd, /usr/bin/passwd [A-Za-z]*, !/usr/bin/passwd root
 ```
 此外可以为多个用户或多个COMMAND设置别名，来统一设置多个用户的权限。
+
+### Linux主机上的用户信息传递
+一、查询用户已经登录在系统上的用户可以使用`w`或`who`，想要知道每个账户最近登录的时间可以使用`lastlog`，想要知道最近一段时间内的主机登录记录可以使用`last`命令。
+
+二、在使用`who`后能看到正在使用主机的其他用户极其端口（如pts/1），那么使用`write username pts/1`就可以输入要发送给他的信息，使用Ctrl+d结束输入后对方就可收到信息。每个用户可以使用`mesg n/y`来选择关闭或开启消息接收。另外，使用`wall "message"`可以向全体用户广播信息。
+
+三、可以使用`mail username@host`来给用户写邮件，直接使用`mail`则是直接进入邮件程序，不过现在该程序使用得非常少了。
+
+****
+## 第15章 磁盘配额与高级文件系统管理
+**暂时略过**
+****
