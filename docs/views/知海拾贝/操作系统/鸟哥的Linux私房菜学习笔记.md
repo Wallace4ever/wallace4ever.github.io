@@ -2274,3 +2274,71 @@ wallace ALL=(root)  !/usr/bin/passwd, /usr/bin/passwd [A-Za-z]*, !/usr/bin/passw
 ## 第15章 磁盘配额与高级文件系统管理
 **暂时略过**
 ****
+
+## 第16章 例行性工作
+Linux下有两种工作调度方式，一种是突发性的（at，需要atd服务），一种是例行性的（crontab，需要crond服务）。
+
+### 仅执行一次的工作调度at
+/etc/at.deny和/etc/at.allow（更严格，优先级更高，一般只用前者）分别可以存储执行at命令的账户的黑名单和白名单。
+
+at的使用格式为`at [-mldv] TIME`，TIME是指定的时间，按下回车后可以进入at shell输入要执行的多条命令，使用Ctrl+d结束输入；此外还可以使用`at -c 1/2/...`查看已经规划好的第n个计划任务。
+* -m，（at中执行的stdin/out和终端机环境无关，如果不手动指定输出到终端设备如/dev/tty1的话就会输出到用户的邮箱，计划任务中没有输出则不会发送）使用该选项可以在没有输出信息时仍然发邮件通知用户任务已经完成。
+* -l，列出目前系统上该用户的所有at任务。等同于`atq`命令。
+* -d，取消一个at中计划的任务。等同于`atrm`命令。
+* -v，使用较明显的时间格式显示计划任务列表。
+* TIME的格式：
+    1. 04：00
+    2. 04：00 2020-12-09
+    3. 04：00pm March 17
+    4. [HH:MM[am|pm]|now] + n [minutes|hours|days|weeks]
+
+另外，如果执行at命令时的工作目录是working directory，那么时间到之后at执行任务的工作目录也是该目录，和用户是否还在该目录、用户是否通过终端机登录到系统都没有关系。因为系统会将该项at工作独立出当前用户的shell环境中，并交给atd程序来接管。
+
+如果想要在CPU负载低的时候（单一时间内负责的工作数量）才执行计划任务可以使用`batch TIME`来规划，其底层还是调用了at，所以可以用at查看、取消这些任务。
+
+### 周期性工作调度crontab
+cron的名字来自于希腊语chronos，意思是时间。
+
+/etc/cron.deny和/etc/cron.allow（更严格，优先级更高，一般只用前者）分别可以存储执行crontab命令的账户的黑名单和白名单。在各用户使用crontab这个命令来新建任务调度后，任务调度会被记录到/var/spool/cron/$USERNAME中（尽量不要直接编辑该文件），并且cron每一项工作的日志都会记录到/var/log/cron中。
+
+该命令的语法为`crontab [-u username] [-l|-e|-r]`，选项为：
+* -u，仅仅root可以使用此选项为其他用户创建计划任务
+* -e，编辑crontab的工作内容
+* -l，查询crontab的工作内容
+* -r，删除所有的crontab工作内容
+
+使用-e的话会调用vi编辑上面提到的文件，其实就是cron "tab"le嘛，表格的格式为：
+|分|时|日|月|周几|命令串|
+|---|---|---|---|---|:-:|
+|20|12|*|*|*|mail wallace -s "at 12:00" < /home/wallace/.zshrc|
+
+上面表格中使用星号表示任意日/月/周只要是12时都执行命令；在同一列中可以用逗号分隔多个满足条件的时间点；可以用减号连接表示一个时间段内所有的整时间点（例如20 8-10表示8:20、9:20、10:20这三个时间点都要执行）；可以用/n表示每n个间隔单位就进行一次（*/5和0-59/5意思相同）。
+
+### 系统的配置文件/etc/crontab
+一般用户的例行任务被记录在/var/spool/cron/$USERNAME中，而系统级别的任务则记录在/etc/crontab中，相比前者多了几条记录以及要以什么用户的身份执行：
+```sh
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+
+# For details see man 4 crontabs
+
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name  command to be executed
+```
+`run-parts`是一个存放于/bin下的可执行脚本，后接一个目录，作用是运行该目录下所有的脚本。在任务规划时可以使用该命令批量运行写好的脚本。
+
+### 可唤醒停机期间的工作任务
+在不是7*24运行的主机环境下，anacron会检测停机期间应该进行但是没有进行的crontab任务，将他们执行一遍，然后anacron就自动停止了。anacron会以一天、一周、一个月为期去检测系统未进行的croontab任务。
+
+anacron的运行时间点通常有两个：一是在开机期间运行，二是写入crontab的调度中来在特定时间分析系统未进行的工作。其语法为`anacron [-sfn] JOB ...`，常用的参数为：
+* -s，start开始连续执行各项工作
+* -f，force强制执行而不会去判断时间记录文件
+* -n，now立刻进行未进行的任务，而不延迟等待时间
+* -u，仅更新时间记录文件的时间戳，不进行任何工作。
