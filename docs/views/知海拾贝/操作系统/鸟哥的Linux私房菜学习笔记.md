@@ -2385,6 +2385,7 @@ kill的用法为`kill -signal %jobnumber`，kill常用的选项有
 * -2，发送信号2（-SIGINT），Ctrl+c也是发送了这个信号，表示中断，如何响应中断由程序决定，通常是退出程序。
 * -9，发送信号9（-SIGKILL），强力杀死该进程。
 * -15，发送信号15（-SIGTERM），以常规流程结束进程。
+* -19，发送信号19（-SIGSTOP），相当于用Ctrl+z暂停一个进程执行
 
 其实kill的功能不仅限于管理当前shell的jobs，更是可以管理进程process，上面的格式中如果不加%则后面的数字就是进程的pid。
 
@@ -2401,14 +2402,14 @@ kill的用法为`kill -signal %jobnumber`，kill常用的选项有
 
 进程查看有两种方式，静态的ps（processes snapshot）和动态的top。
 
-关于ps，手册比较复杂，鸟哥推荐两个常用的用法：查看当前shell有关的所有进程`ps -l`和查看所有系统运行的程序`ps -aux`（其实这样记忆不太合适）。
+关于ps，手册比较复杂，鸟哥推荐两个常用的用法：查看当前shell有关的所有进程`ps -l`和查看所有系统运行的程序`ps aux`（其实这样记忆不太合适）。
 ```sh
 ➜  ~ ps -l             
 F S   UID   PID  PPID  C PRI  NI ADDR SZ WCHAN  TTY          TIME CMD
 4 S     0  3709  3598  0  80   0 - 58090 do_wai pts/0    00:00:00 su
 4 S     0  3718  3709  0  80   0 - 38168 sigsus pts/0    00:00:06 zsh
 0 R     0  8974  3718  0  80   0 - 38331 -      pts/0    00:00:00 ps
-➜  ~ ps -aux | head -n 3 
+➜  ~ ps aux | head -n 3 
 USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
 root         1  0.0  0.3 194172  7324 ?        Ss   16:08   0:03 /usr/lib/systemd/systemd --switched-root --system --deserialize 22
 root         2  0.0  0.0      0     0 ?        S    16:08   0:00 [kthreadd]
@@ -2419,8 +2420,135 @@ root         2  0.0  0.0      0     0 ?        S    16:08   0:00 [kthreadd]
 * -u，有效用户的相关进程
 * -f，做一个更完整的输出
 
+ps -l是UNIX格式，指的是BSD long format，输出的内容含义为：
+* F，process flag，说明进程权限。4表示有root权限，1表示仅可以fork但不能exec
+* S，stat，说明进程状态。R表示Running，S表示Sleep，D表示不可中断的睡眠状态（如IO阻塞），T表示sTopped，Z表示Zombie僵尸进程。
+* UID/PID/PPID，不解释了。
+* C，CPU使用率百分比。
+* PRI/NI，priority/nice，进程被执行的优先级都是越小则越早被执行
+* ADDR/SZ/WCHAN，与内存地址、占用有关
+* TTY，登录者使用的终端机
+* TIME，实际获得CPU运行的时间
+* CMD，command，程序触发进程的命令
+
+ps aux是BSD格式，不带有dash符号（-）实测带了似乎也可以。a表示去掉“only yourself”的限制，x表示去掉“must have a tty”的限制，u表示输出格式为user-oriented format。输出内容的含义为：
+* USER，进程属于哪个用户帐号
+* PID，进程id
+* %CPU，进程使用的CPU百分比
+* %MEM，进程使用的内存百分比
+* VSZ，进程使用的virtual mem size，单位为kb
+* RSS，resident set size，进程使用的非swap内存的内存大小，单位为kb
+* TTY，同上TTY
+* STAT，同上S
+* START，进程被触发启动的时间
+* TIME，同上TIME
+* COMMAND，进程的实际命令
+
+僵尸进程指的是进程正常执行完毕或因故终止后，该进程的父进程无法将该进程结束掉，导致该进程一直存在于内存中。
+
 如果要找进程之间的相关性，`pstree`很好用，用法为`pstree [-A|-U] [-up]`，选项：
 * -A，进程树间用ASCII字符连接
 * -U，进程树间用UTF-8字符连接，某些不兼容的终端下可能出现错误
 * -p，同时列出进程的pid
 * -u，同时列出进程所属帐号的名称。
+
+想要动态查看进程的变化可以使用top（或安装htop），使用方式为：`top [-d NUMBER]`或者`top [-bnp]`，说明：
+* -d，（delay-time）后接top刷新间隔的秒数，默认为5s
+* -b，以批处理的方式执行top，通常会搭配数据流重定向将批处理的结果输出到文件
+* -n，与-b搭配表示需要几次top输出的结果
+* -p，指定某些PID来进行检测
+* top执行过程中可以使用的按键命令有：
+    * ?，显示可用的按键命令
+    * P，（大写）以CPU使用率排序显示
+    * M，（大写）以内存使用率排序显示
+    * m，切换上方的内存显示视图
+    * N，以PID来排序
+    * T，以已使用的总CPU时间来排序
+    * k，给予某个PID一个信号（kill）
+    * r，给某个PID重新定制一个nice值（renice）
+    * q，退出top
+    * 1，切换多内核CPU环境下第三行的视图为总体或单个
+
+二、进程的管理
+
+操作系统管理进程就是通过给进程发送一个信号来实现的，这个也是面试长问问题之进程间的通信机制之一。在前面`kill`那边我们提到过一些信号可以参考。能使用的所有信号可以通过`kill -l`查看。
+
+kill发送信号时需要知道明确的pid，想要通过command name直接发送信号就可以使用`killall`，格式为`killall [-iIe] -SIGNAL [COMMAND NAME]`：
+* -i，interactive，交互式确认
+* -I，Ignore-case，忽略名称大小写差异
+* -e，exact，进程名要和后面的命令名（不能超过15个字符）完全一致
+
+```sh
+# 依次询问每个bash是否需要杀死（包括当前bash，所以必须要交互式确认）
+killall -i -9 bash
+```
+
+三、进程的执行顺序
+
+前面提到过PRI与NI，priority是由内核动态调整的用户无法直接调整，用户只能调整nice值，二者的关系为：
+```
+PRI(new) = PRI(old) + nice
+```
+nice可调整的范围是-20~19（root），给予负值PRI减小优先级提高，反之同理。普通用户nice可调整的范围是0~19，并且同一个进程只能越调越高，这是为了避免抢占资源。另外修改了nice后PRI并不一定立刻改变，而是系统分析后才可能修改并且不一定加满nice。
+
+可以在执行命令时就在前面通过`nice`指定nice，也可以通过`renice`来修改已有进程的nice值
+```sh
+nice -n NUMBER COMMAND
+renice NUMBER PID
+```
+
+四、系统资源的查看
+
+使用`free [-b|k|m|g]（单位） [-t]（除了mem和swap额外显示total）`来查看当前内存用量。
+
+使用`uname [-a|-srmpi]`可以查看内核与系统相关的简要信息。
+
+使用`uptime`可以查看系统开机运行了多久。
+
+使用`netstat`可以用于监控网络相关的进程，选项有：
+* -a，将系统上所有的连接、监听、Socket数据都列出来
+* -t，列出tcp网络数据包的数据
+* -u，列出udp网络数据包的数据
+* -n，不列出进程的服务名称而是以端口号来显示
+* -l，列出目前正在网络监听listen的服务
+* -p，列出进程的PID
+
+使用`dmesg`来分析内核产生的信息。
+
+使用`vmstat`来跟踪监测系统资源的变化。
+
+### 特殊文件与程序
+
+具有SUID权限的可执行文件在运行时取得PID后，其进程的PCB权限设置部分会具有该SUID对应的权限，所以该权限进在运行时才具有。
+
+/proc是一个虚拟文件系统，实际上存在于内存中。Linux的哲学是一切皆文件，该目录下每一个PID都有对应的目录，各个进程的相关信息就存放在里面。
+
+另外，/proc下一些记录了系统相关信息的文件有：
+* cmdline，加载kernel时所执行的相关参数
+* cpuinfo，本机CPU的相关信息
+* devices，记录了主要设备代号
+* filesystems，目前系统已经加载的文件系统
+* interrupts，目前系统IRQ的分配状态
+* ioports，各设备的IO地址
+* kcore，文件很大，是内存的大小（不要尝试去读该文件）
+* loadavg，uptime top上面的三个平均值5 10 15分钟时的平均负载
+* meminfo，free列出的内存信息
+* modules，内核加载的模块（驱动程序）列表
+* mounts，已经挂载的数据
+* swaps，swap使用的分区
+* partitions，分区信息
+* pci，lspci能查到的pci设备信息
+* uptime，见名知意
+* version，uname -a
+* bus/*，一些总线设备的信息
+
+可以通过`fuser`file user找出正在使用某文件的程序，用法为`fuser [-umv] [-k [i] [-SIGNAL]] FILE/DIR`
+* -u，除了pid外同时列出进程的所有者
+* -m，后接的文件名会主动上提到文件系统的顶层
+* -v，列出文件、程序命令之间的相关性
+* -k，试图向找到的程序发送signal，不写signal的话默认是-9（SIGKILL）
+* -i，与-k配合，发送信号前询问用户意见
+
+可以通过`lsof`list output file打印出被进程所打开的文件名。
+
+可以通过`pidof PROCESSNAME`来根据名称查找进程pid。
