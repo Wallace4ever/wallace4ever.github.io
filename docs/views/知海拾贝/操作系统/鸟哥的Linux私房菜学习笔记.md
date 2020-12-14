@@ -2549,6 +2549,55 @@ renice NUMBER PID
 * -k，试图向找到的程序发送signal，不写signal的话默认是-9（SIGKILL）
 * -i，与-k配合，发送信号前询问用户意见
 
-可以通过`lsof`list output file打印出被进程所打开的文件名。
+可以通过`lsof`list open files打印出被进程所打开的文件名。
 
 可以通过`pidof PROCESSNAME`来根据名称查找进程pid。
+
+### SELinux初探
+SELinux的全称是Secure Enhanced Linux，其设计的目标是避免使用者的资源误用，本质上是**进行程序、文件权限设置依据的一个内核模块**。
+
+传统的访问文件系统的方式称为**自主访问控制**（DAC，Discretionary Access Control），依据进程的所有者与文件资源的权限设置来确定有无访问的能力，这种情况下如果管理员对某些目录的权限设置不当则可能导致潜在的风险；而SELinux导入了**强制访问控制**（MAC，Mandatory Access Control），以策略规则制定特定程序读取特定文件，可以针对**特定的进程**与**特定的文件资源**来进行权限的控制。
+
+一、SELinux的运行模式与相关概念
+* 主体Subject：其想要管理的主体就是进程。
+* 目标Object：主体进程想要访问的目标资源就是文件系统。
+* 策略Policy：SELinux会依据某些服务来制定基本的访问安全性策略，策略内还有详细的规则（rule）来指定不同的服务开放某些资源的访问与否。
+    * targeted：针对网络服务限制较多，针对本机限制较少，是默认策略。
+    * strict：完整的SELinux限制，限制方面较为严格。
+* 安全上下文：除了策略指定之外，主题与目标的安全上下文必须完全一致才能访问。目前我们可以将安全上下文粗略理解为SELinux内的rwx。
+    * 安全上下文对于进程来说是存入内存中的，对于文件来说是存入inode中的。
+    * 在系统启用了SELinux后，可以通过`ls -Z`来查看文件的安全上下文，通过`ps -Z`来查看进程的安全上下文。CentOS7中的示例为：“system_u:object_r:admin_home_t:s0”，前三个字段的意义为：
+        * 身份标识（identify）：相当于帐号方面的身份标识，包括：
+            * root，表示root的帐号身份
+            * system_u，表示系统程序方面的标识
+            * user_u，代表一般用户帐号的相关身份
+        * 角色（role）：通过角色字段我们可以知道这个数据是属于程序、文件资源还是代表用户，包括：
+            * object_r，代表文件资源（目标）
+            * system_r，代表进程
+        * 类型（type）：最重要的字段，在文件（Object）上的定义为type，在进程（Subject）上的定义为domain。
+
+例子，/usr/sbin/httpd服务与/var/www/html目录：
+```sh
+➜  ~ ll -Zd /usr/sbin/httpd /var/www/html
+-rwxr-xr-x. root root system_u:object_r:httpd_exec_t:s0 /usr/sbin/httpd
+drwxr-xr-x. root root system_u:object_r:httpd_sys_content_t:s0 /var/www/html
+```
+首先执行的httpd这个可执行文件具有httpd_exec_t这个类型type，该类型会让这个文件造成的主体进程subject具有httpd_t这个域domain，而系统设置的策略针对这个域已经定制了许多规则，其中包括了这个域可以读取的目标资源类型（包括了httpd_sys_content_t这个类型），那么把网页放置到/var/www/html目录下就能够被httpd这个进程读取了。当然最后能否读到正确的数据还是要看rwx权限是否符合Linux权限规范。
+
+二、SELinux的启动关闭与查看
+
+目前SELinux支持三种模式，可以使用`getenforce`命令来查看：
+* enforcing：强制模式，表示SELinux正在运行，并且已经正确开始限制domain/type了
+* permissive：宽容模式，表示正在运行中，不过仅仅是有警告信息而实际不会限制domain/type的访问，一般用于调试
+* disabled：关闭，SELinux并没有运行
+
+通过`sestatus`可以查看SELinux的策略等状态信息，使用-v选项可以检查/etc/sestatus.conf内的安全上下文内容，使用-b选项可以检查目前所有规则的的启动状态。想要启动、关闭或调整SELinux的运行模式与策略，可以修改/etc/selinux/config并重启计算机。另外grub启动菜单中如果配置了selinux=0会无视掉前面的配置而直接略过selinux的加载。（在启用状态下可以通过`setenforce 0|1`来在enforcing和permissive模式之间切换）
+
+三、修改安全上下文
+
+鸟哥举的例子是在root的主目录下创建index.html再移动到/var/www/html目录下，这时权限没问题但是由于文件的type是user_home_t而不是httpd_sys_content_t所以在浏览器中无法访问。通过`chcon`可以修改，格式为`chcon [-R] [-t TYPE] [-u USER] [-r ROLE] 文件`：
+* -R，递归修改
+* -t，-u，-r，对应type，user，role很好理解了
+* --reference=范例文件，按照范例文件修改
+
+另外，某些目录具有默认的安全上下文，可以使用`restorecon [-R] FILE/DIR`来恢复默认的安全上下文。
