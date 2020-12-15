@@ -2601,3 +2601,26 @@ drwxr-xr-x. root root system_u:object_r:httpd_sys_content_t:s0 /var/www/html
 * --reference=范例文件，按照范例文件修改
 
 另外，某些目录具有默认的安全上下文，可以使用`restorecon [-R] FILE/DIR`来恢复默认的安全上下文。
+
+四、SELinux所需的服务
+
+鸟哥提到有名为`setroubleshoot`的服务用于将错误信息写入/var/log/messages，但是在CentOS7中我使用chkconfig没有找到该服务，理论上该服务记录的信息会给出SELinux拦截的错误信息与对应允许访问的解决方法。
+
+另外还有名为auditd的服务将SELinux发生的信息写入/var/log/audit/audit.log，日志内容非常庞大，可以使用`audit2why < /var/log/audit/audit.log`来读入该文件并分析其中的错误信息。
+
+五、SELinux的策略与规则管理
+
+策略查阅：CentOS默认使用targeted策略，想要知道该策略提供多少相关规则可以使用`seinfo`（CentOS7需要安装setools才能使用）来查询：
+* --all，列出SELinux的状态、规则布尔值、身份识别、角色、类型等所有信息（真的非常多）
+* -t，列出所有类型type的种类
+* -r，列出所有角色role的种类
+* -u，列出所有身份标识user的种类
+* -b，列出所有规则bool值的种类
+
+我们使用seinfo结合grep找到想要的内容（如httpd）后，可以用`sesearch`查询细节（我在CentOS7上安装的setools中sesearch的选项已经和鸟哥介绍的不同了）。
+
+Subject是否能够访问Object是和bool值有关的，通过seinfo -b可以知道所有的布尔值，那么这些布尔值是启动还是关闭的呢就可以使用`getsebool [-a] [bool值]`来查看所有或某一项bool值的情况。
+
+如果查询到某个bool值，并以sesearch知道该bool值的用途后，可以通过`setsebool [-P] [0|1]`来关闭或启动该布尔值，-P选项可以将设置值写入配置文件。
+
+可以使用`semanage`来查询、修改各种目录的默认安全上下文（fcontext）。semanage还有更多更强大的功能。
