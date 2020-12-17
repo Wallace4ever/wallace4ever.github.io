@@ -2624,3 +2624,139 @@ Subject是否能够访问Object是和bool值有关的，通过seinfo -b可以知
 如果查询到某个bool值，并以sesearch知道该bool值的用途后，可以通过`setsebool [-P] [0|1]`来关闭或启动该布尔值，-P选项可以将设置值写入配置文件。
 
 可以使用`semanage`来查询、修改各种目录的默认安全上下文（fcontext）。semanage还有更多更强大的功能。
+
+## 第18章 认识系统服务
+在UNIX-Like的操作系统中，deamon指的是守护进程，系统的服务（service）需要特定的deamon来实现。前者偏实现，后者偏逻辑。
+
+### 认识daemon与service
+daemon一般分为两类：
+* stand_alone，可以自行单独启动服务，加载到内存后就一直占用内存等系统资源，相应速度较快。如httpd（WWW服务）和vsftpd（FTP服务）。
+* super daemon，通过一个特殊的daemon（例如xinetd）来管理，没有客户端请求时对应各项服务都是未启动的状态，有请求时super daemon才唤醒对应的服务，请求结束后对应的服务会被关闭。super daemon可以有安全控管的机制，节约系统资源。super daemon也有单线程与多线程两种模式。
+
+daemon如果按照提供服务的工作状态来区分，又可以分为signal-control（立即响应请求，如cupsd）和interval-control（定期执行某项工作，如atd和crond）两种。
+
+不同服务对应不同的daemon进程，处理网络请求时操作系统通过使用不同的端口号（port）区分不同的服务进程，默认存储在`/etc/services`这个文件中。
+
+一些需要注意的目录：
+* /etc/init.d/，几乎所有的stand_alone类型服务启动脚本都放置在这里，CentOS7是systemd-based OS，绝大部分的启动脚本都被`systemctl start/stop XXX.service`这样的命令替代。
+* /etc/sysconfig/，几乎所有的服务都会将初始化的一些参数设置写入到这个目录下。例如日志服务syslog的初始化设置就是/etc/sysconfig/syslog，无线网卡的设置是/etc/sysconfig/network-scripts/ifcfg-enp0s3
+* /etc/xinetd.conf和/etc/xinetd.d/，存放了super daemon的配置文件。（我在CentOS7没有看到任何实际文件）
+* /etc，这个目录本身存放了各服务的配置文件
+* /var/lib/，该目录存放了各服务产生的数据库
+* /var/run -> /run，daemon通常会将自己的PID记录一份到该目录中
+
+此外还可以通过/usr/sbin/service这个脚本来启动stand_alone的服务脚本，用法为`service [SERVICE NAME] (start|stop|restart|...)`，在CentOS7中大多数操作会被重定向到systemctl。
+
+### CentOS 7 与 systemd
+
+::: theorem CentOS 7注意点
+CentOS 7 使用 systemd 而不是 SysVinit(CentOS 5) 和 Upstart(CentOS 6)作为自身的初始化系统。
+::: right
+查看 [详情](https://blog.51cto.com/13525470/2060765)
+:::
+
+我手头的这本书是第三版的，仍然是基于CentOS 5的内容。历史上，Linux 的启动一直采用init进程。下面的命令用来启动服务。
+```sh
+sudo /etc/init.d/apache2 start
+# 或者
+service apache2 start
+```
+这种方法有两个缺点:一是启动时间长。init进程是串行启动，只有前一个进程启动完，才会启动下一个进程；二是启动脚本复杂。init进程只是执行启动脚本，不管其他事情。脚本需要自己处理各种情况，这往往使得脚本变得很长。
+
+Systemd 就是为了解决这些问题而诞生的。它的设计目标是，为系统的启动和管理提供一套完整的解决方案。Systemd 的优点是功能强大，使用方便，缺点是体系庞大，非常复杂。
+
+`systemctl`是 Systemd 的主命令，用于管理系统。
+```sh
+# 重启系统
+$ sudo systemctl reboot
+
+# 关闭系统，切断电源
+$ sudo systemctl poweroff
+
+# CPU停止工作
+$ sudo systemctl halt
+
+# 暂停系统
+$ sudo systemctl suspend
+
+# 让系统进入冬眠状态
+$ sudo systemctl hibernate
+
+# 让系统进入交互式休眠状态
+$ sudo systemctl hybrid-sleep
+
+# 启动进入救援状态（单用户状态）
+$ sudo systemctl rescue
+```
+
+`systemd-analyze`命令用于查看启动耗时。
+
+```sh
+# 查看启动耗时
+$ systemd-analyze                    
+# 查看每个服务的启动耗时
+$ systemd-analyze blame
+
+# 显示瀑布状的启动过程流
+$ systemd-analyze critical-chain
+
+# 显示指定服务的启动流
+$ systemd-analyze critical-chain atd.service
+```
+
+`hostnamectl`命令用于查看当前主机的信息。
+```sh
+# 显示当前主机的信息
+$ hostnamectl
+
+# 设置主机名。
+$ sudo hostnamectl set-hostname rhel7
+```
+
+此外，`localectl`命令用于查看本地化设置。`timedatectl`命令用于查看当前时区设置。`loginctl`命令用于查看当前登录的用户。
+
+Systemd 可以管理所有系统资源。不同的资源统称为 Unit（单位）。Unit 一共分成12种。
+* Service unit：系统服务
+* Target unit：多个 Unit 构成的一个组
+* Device Unit：硬件设备
+* Mount Unit：文件系统的挂载点
+* Automount Unit：自动挂载点
+* Path Unit：文件或路径
+* Scope Unit：不是由 Systemd 启动的外部进程
+* Slice Unit：进程组
+* Snapshot Unit：Systemd 快照，可以切回某个快照
+* Socket Unit：进程间通信的 socket
+* Swap Unit：swap 文件
+* Timer Unit：定时器
+
+`systemctl list-units`命令可以查看当前系统的所有 Unit 。`systemctl status`命令用于查看系统状态和单个 Unit 的状态。
+
+对于用户来说，最常用的是下面这些命令，用于启动和停止 Unit（主要是 service）。
+```sh
+# 立即启动一个服务
+$ sudo systemctl start apache.service
+
+# 立即停止一个服务
+$ sudo systemctl stop apache.service
+
+# 重启一个服务
+$ sudo systemctl restart apache.service
+
+# 杀死一个服务的所有子进程
+$ sudo systemctl kill apache.service
+
+# 重新加载一个服务的配置文件
+$ sudo systemctl reload apache.service
+
+# 重载所有修改过的配置文件
+$ sudo systemctl daemon-reload
+
+# 显示某个 Unit 的所有底层参数
+$ systemctl show httpd.service
+
+# 显示某个 Unit 的指定属性的值
+$ systemctl show -p CPUShares httpd.service
+
+# 设置某个 Unit 的指定属性
+$ sudo systemctl set-property httpd.service CPUShares=500
+```
