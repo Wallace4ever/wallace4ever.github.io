@@ -2760,3 +2760,45 @@ $ systemctl show -p CPUShares httpd.service
 # 设置某个 Unit 的指定属性
 $ sudo systemctl set-property httpd.service CPUShares=500
 ```
+
+## 第19章 认识日志文件
+日志文件中通常记录了系统在什么时候由哪个进程做了什么样的行为时，发生了何种事件。日志可以用于帮助解决系统方面的错误或者服务方面的问题，查询过往事件记录。
+
+通常系统和第三方服务的日志会存放在`/var/log`及其对应的子目录下，例如
+* cron，例行性工作调度的执行日志
+* dmesg，开机时内核检测产生的信息
+* lastlog，帐号最近一次登录的相关信息
+* maillog，往来邮件的信息
+* messages，重要，系统发生的错误信息或重要信息（内容很多）
+* secure，涉及到login或者帐号密码的程序的行为会被记录到该文件中
+* wtmp、failog，登录成功与失败的信息（在CentOS7中没有看到failog）
+* httpd/、samba/，特定的服务如httpd会有自己的日志目录
+
+日志文件的产生有两种方式，一是软件开发商自定义写入的文件与相关格式，二是通过将信息丢给syslogd(rsyslogd in CentOS 7)这个服务。除了syslogd之外，还需要logrotate进行日志文件的轮替功能。
+
+### 日志文件的内容
+一般来说精油syslog记录的数据会包含：
+* 事件发生的日期与时间
+* 发生此事件的主机名
+* 启动此事件的服务名称（samba、xinetd）或函数名称（libpam）
+* 信息的实际数据内容
+
+syslog将服务分为auth、cron、deamon、ftp、kern、mail、news、syslog、user等类型。
+
+产生的信息会有不同的等级：
+* info，一些基本的信息说明
+* notice，除了info外还需要注意的内容
+* warning，警告信息，可能有问题，但不至于影响到某个daemon运行
+* error，重大的错误导致服务无法运行
+* critical，错误已经到达临界点
+* alert，更严重警告
+* emergency/panic，系统几乎要死机
+
+有了类型和等级，就可以在配置文件/etc/syslog.conf（CentOS 5）中细分地设置不同服务类型产生的不同等级的信息要被记录到哪里。
+
+另外，日志文件不仅仅可以存储在当前主机的本地磁盘中，还可以指定为打印机、远程主机。可以使用一台单独的主机作为日志服务器来收集管理多台主机的各服务的状态信息，syslog本身就已经具有日志文件服务器的功能了，只是默认没有开启，端口为udp514。
+
+### 日志文件的轮替
+syslog是通过daemon的方式来启动的，有记录日志的需求时就会立即执行，而logrotate是通过cron的方式来执行的（也可以手动使用该命令，根据指定的配置文件/etc/logrotate.conf）。
+
+在配置文件/etc/logrotate.conf中可以定义在特定时间间隔对日志文件进行轮替，并且可以定义最多留存的文件个数、是否压缩日志文件、日志文件的最大大小等等。
