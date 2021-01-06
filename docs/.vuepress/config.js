@@ -94,7 +94,7 @@ module.exports = {
     "logo": "/logo.png",
     "search": true,
     "searchMaxSuggestions": 10,
-    "sidebar": "auto",
+    "subSidebar": "auto",
     "lastUpdated": "上次更新",
     "smoothScroll": true,
     "author": "Wallace Xu",
@@ -128,7 +128,7 @@ module.exports = {
     '@vuepress/last-updated',
     {
       dateOptions:{
-        hour12: true
+        hour12: false
       }
     }
   ]

@@ -39,7 +39,7 @@ drwxrwxr-x. 9 root root    4096 Aug  9 14:34 redis-6.0.6
 
 文件夹权限示例：我们在所有用户都可以工作的/tmp目录下以root用户的身份创建一个文件夹、在文件夹内创建一个普通文件，再切换到普通用户并尝试访问该文件夹：
 ```bash
-# 1.新建的文件夹默认权限为755
+# 1.root用户umask=022，新建的文件夹默认权限为755（777-022），新建文件的权限是644（666-022）
 ➜  /tmp mkdir testdir
 # 这时以普通用户的身份是能查看testdir下的文件列表的
 [wallace@centos-vm tmp]$ ls -l testdir/
@@ -146,7 +146,7 @@ chmod a-x myscript.sh
 :::
 
 ### Linux目录配置
-通常各Linux发行版的目录配置的方式都遵循所谓的FHS（Filesystem Hierarchy Standard）即文件系统层次结构标准。FHS将Linux目录定义为两个维度共四种交互作用的形态。分别是：不变的（static）与可变的（variable）、可分享的（sharable）与不可分享的（unshareable）。
+通常各Linux发行版的目录配置的方式都遵循所谓的FHS（Filesystem Hierarchy Standard）即文件系统层次结构标准。FHS将Linux目录定义为两个维度共四种交互作用的形态。分别是：不变的（static）与可变的（variable）、可分享的（shareable）与不可分享的（unshareable）。
 * 不变的：有些不随着distribution变动的文件，例如函数库、说明文件等。
 * 可变动的：经常改变的数据，例如登陆文件、新闻组等。
 * 可分享的：可以分享给其他系统挂载使用的目录
@@ -183,7 +183,7 @@ FHS核心定义了根目录、/usr目录、/var三个目录下应该放置什么
 
 2. /usr目录的意义与内容
 
-    该目录的含义为UNIX Softeware Resource，存放的数据属于可分享的、不可变的。这里存放的不是用户数据而是系统软件资源。类似于Windows下C:\Windows和C:\Program files两个目录的综合体。
+    该目录的含义为UNIX Software Resource，存放的数据属于可分享的、不可变的。这里存放的不是用户数据而是系统软件资源。类似于Windows下C:\Windows和C:\Program files两个目录的综合体。
     ```bash
     ➜  /usr tree -d -L 1
     .
@@ -266,7 +266,7 @@ $PATH：是命令执行的搜索范围，普通用户的$PATH内容可能不包�
 * -t，按照时间排序
 * -R，递归列出子目录中的内容
 * --full-time，显示详细时间
-* -time={atime,ctime}，显示access time / 权限属性的change time，而非内容修改的时间modification time
+* --time={atime,ctime}，显示access time / 权限属性的change time，而非内容修改的时间modification time
 
 二、cp命令除了单纯地复制文件，还可以创建连接文件，对比两个文件地新旧再予以更新，复制整个目录。cp可以用于复制单个文件或目录：`cp [-r] source dest`那么这时dest可以是目录或者新文件的绝对名称；也可以用于同时复制多个文件到某个目录下：`cp source1 source2 ... dest`那么dest只能是目标目录。
 
@@ -1154,7 +1154,7 @@ var=(65 89)
 一、别名alias：前面我们提到过常用的`ll`其实就是`ls -lh`的别名，在bash中可以使用`alias customName='COMMAND [-options]'`来设置别名，使用`unalias customName`可以取消别名，直接输入alias可以查看目前已经设置了那些别名。
 
 二、历史命令history：使用history可以查看bash的历史记录（存储在~/.bash_history中），常用的参数和选项有：
-* n，列出最近的n条记录（我试了下似乎总是显示全部历史记录）
+* n，列出最近的n条记录（在zsh下总是显示全部历史记录，bash中正常）
 * -c，清除目前shell的全部历史记录
 * -a，将目前新增的命令历史追加写入到histfiles中，未指定则默认写入.bash_history
 * -r，将histfiles的内容读到目前shell的history记忆中
@@ -1384,7 +1384,7 @@ last | tee -a last.list | cut -d '' -f 1
 * -1 n，第一个文件用第n个字段作为key
 * -2 n，第二个文件用第n个字段作为key
 
-在我个人看来更像是类似于按照数据库的key进行连表操作（数据库中表的连接也成为join），假如我们要处理两个文件：
+在我个人看来更像是类似于按照数据库的key进行连表操作（数据库中表的连接也称为join），假如我们要处理两个文件：
 ```bash
 # 两个文件分别以uid为主键记录了一些指标
 ➜  ~ cat file1                         
@@ -2266,7 +2266,7 @@ wallace ALL=(root)  !/usr/bin/passwd, /usr/bin/passwd [A-Za-z]*, !/usr/bin/passw
 ### Linux主机上的用户信息传递
 一、查询用户已经登录在系统上的用户可以使用`w`或`who`，想要知道每个账户最近登录的时间可以使用`lastlog`，想要知道最近一段时间内的主机登录记录可以使用`last`命令。
 
-二、在使用`who`后能看到正在使用主机的其他用户极其端口（如pts/1），那么使用`write username pts/1`就可以输入要发送给他的信息，使用Ctrl+d结束输入后对方就可收到信息。每个用户可以使用`mesg n/y`来选择关闭或开启消息接收。另外，使用`wall "message"`可以向全体用户广播信息。
+二、在使用`who`后能看到正在使用主机的其他用户及其端口（如pts/1），那么使用`write username pts/1`就可以输入要发送给他的信息，使用Ctrl+d结束输入后对方就可收到信息。每个用户可以使用`mesg n/y`来选择关闭或开启消息接收。另外，使用`wall "message"`可以向全体用户广播信息。
 
 三、可以使用`mail username@host`来给用户写邮件，直接使用`mail`则是直接进入邮件程序，不过现在该程序使用得非常少了。
 
