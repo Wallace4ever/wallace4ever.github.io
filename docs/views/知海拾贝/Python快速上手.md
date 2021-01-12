@@ -290,3 +290,6 @@ infile = open("test.txt", 'r')
 sentenceList = [line.strip() for line in infile]  # 这里还可以对line进一步操作例如eval(line)
 infile.close()
 ```
+
+****
+**未完待续**
