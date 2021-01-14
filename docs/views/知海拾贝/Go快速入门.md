@@ -207,8 +207,135 @@ func main() {
 ```
 
 ### 04 类型转换和别名
+Go语言不允许隐式的转换，必须显式声明，另外两种类型必须兼容（例如byte/rune和整形兼容，bool类型和整形不兼容不能互相转换），例如：
+```go
+var ch byte = 97
+var a int = int(ch)
+```
+类型别名：我们可以使用`type`关键字给已有的类型起别名，例如要给int64类型起别名为bigint：
+```go
+func main() {
+	type long int64
+	var b long
+	fmt.Printf("Type of b : %T", b) //Type of b : main.long
+}
+```
+
 ### 05 运算符
+Go语言的算术运算符和大多数语言相同：`+-*/%`，但注意Go语言中自增自减运算符`++`和`--`只能后置不能前置。
+
+Go语言的关系运算符的写法也和大多数语言相同：大于`>`、小于`<`、等于`==`、大于等于`>=`、小于等于`<=`，不等于`!=`。
+
+Go语言的逻辑运算符也和大多数语言相同：与`&&`、或`||`以及非`!`。
+
+Go语言的位运算符包括：按位与`&`、按位或`|`、按位异或`^`、左移`<<`以及右移`>>`。
+
+Go语言和C语言类似还有取地址运算符`&`和取值运算符`*`，两者分别对变量和指针变量有效，例如`&a`表示取变量a的地址、`*a`表示取指针变量a所指向的内存中存放的值。
+
 ### 06 流程控制
+Go语言和大多数语言一样支持顺序结构、选择结构和循环结构。
+
+选择结构：
+```go
+// if 选择
+func testIf() {
+	s := 92
+	if s >= 80 { //Go的判断条件不需要加括号
+		fmt.Println("成绩优秀")
+	}
+
+	//if支持写入一个初始化语句，初始化语句和判断条件用分号分隔
+	if t := 75; t >= 80 {
+		fmt.Println("成绩优秀")
+	} else if t >= 60 {
+		fmt.Println("成绩不佳")
+	} else{
+		fmt.Println("不及格")
+	}
+}
+
+// switch 选择
+func testSwitch() {
+	sex := '男'
+	switch sex { //同样地，sex也不用加括号
+		case '男':
+			fmt.Println("左转")
+			break //Go保留了break关键字，但switch语句中每个case结束默认break所以不用写
+		case '女':
+			fmt.Println("右转")
+			fallthrough //如果使用了该关键字并能被执行到这里，下面的所有case都会无条件执行
+		default :
+			fmt.Println("起飞")
+	}
+
+	//类似地，可以把一条初始化语句放到switch中
+	switch age := 24; age {
+		case 10, 20:
+			//some actions
+		//...
+	}
+
+	//switch也可以没有目标变量，这时要在case中放条件
+	score := 81
+	switch {
+		case score >= 80:
+			fmt.Println("成绩优秀")
+		case score >=60:
+			fmt.Println("成绩良好")
+		default:
+			fmt.Println("不及格")
+	}
+}
+```
+
+循环结构：Go语言中没有while或者do...while关键字，只有for循环和range迭代器：
+```go
+//一般的for循环
+func testFor() {
+	sum := 0
+	for i := 1; i <= 100; i++{ //同样不需要括号
+		sum += i
+	}
+	fmt.Println("sum = ", sum)
+
+	str := "abc"
+	for i := 0; i < len(str); i++ {
+		fmt.Printf("str[%d] is %c\n", i, str[i])
+	}
+}
+
+//range默认返回两个值：元素的位置和元素本身
+func testRange() {
+	str := "abc"
+	for i, data := range str { //如果不需要第二个返回值可以写为i := 或者i, _ :=
+		fmt.Printf("str[%d] is %c\n", i, data)
+	}
+}
+```
+
+在Go中，`break`关键字可以用于for、switch和select，而continue只能用于for循环。
+```go
+func testBreak() {
+	i := 0
+	for { //可以按照需要省略初始条件、终止条件和动作，如果都省略那么两个封号也可以省略（死循环）
+		i++
+		if i == 5 {
+			break 
+		}
+		fmt.Println("i = ", i)
+	}
+}
+```
+Go语言保留了`goto`关键字，但是尽量不要使用，频繁使用goto跳转会让代码逻辑看起来很混乱。goto可以用在任何地方，但是不能跨函数跳转。用户定义的标签（label）定义了就一定要使用否则编译不通过。
+```go
+func testGoto() {
+	fmt.Println("Step 1")
+	goto MyLabel
+	fmt.Println("Step 2")
+MyLabel: //
+	fmt.Println("Step 3")
+}
+```
 
 ## 第二章 函数、工程管理
 ### 01 自定义函数
