@@ -338,7 +338,90 @@ MyLabel: //
 ```
 
 ## 第二章 函数、工程管理
+Go语言的函数名称首字母小写则为private、大写则为public，定义格式如下：
+```go
+func FuncName(/*参数列表*/) (o1, o2 type1, o3 type2 /*返回类型*/) {
+	//函数体
+
+	return v1, v2, v3 //返回多个值
+} 
+```
+
 ### 01 自定义函数
+定义无参数、无返回值的函数：
+```go
+func MyFunc() {
+	fmt.Println("This is a test function.")
+}
+```
+
+定义有普通参数、无返回值的函数：
+```go
+//这里的abc称为形参
+func MyFunc(a, b int, c string /*这里不需要var关键字*/) {
+	fmt.Printf("a = %d, b = %d, c is %s\n", a, b, c)
+}
+
+func main() {
+	//传递的是实参
+	MyFunc(233, 2333, "cool")
+}
+```
+
+定义有不定参数（指参数的个数不确定）、无返回值的函数：
+```go
+//不定参数（类似于Java中本质上是数组的可变参数），其本质是切片
+//和Java一样，不定参数可以和普通参数一起使用，但只能放在形参列表的最后
+func MyFunc(args ... int) {
+	fmt.Println("len(args) = ", len(args))
+	for i := 0; i < len(args); i++ {
+		fmt.Printf("args[%d] = %d\n", i, args[i])
+	}
+
+	for i, value := range args {
+		fmt.Printf("args[%d] = %d\n", i, value)
+	}
+}
+```
+
+在不同多个函数之间传递不定参数：
+```go
+func MiddleFunc(args ... int) {
+	//调用上面的函数，把全部元素传递过去
+	MyFunc(args...)
+	//假设不定参数有4个，我只想把后2个（第2、3个）参数传递出去
+	MyFunc(args[2:]...) //从args[2]开始到结束，左闭右开，类似于Python的切片写法
+}
+```
+
+定义无参数、有一个返回值的函数：
+```go
+//只有1个返回值
+func MyFunc1() int { //只有1个返回值可以省略第二个括号
+	//some codes
+	return 666
+}
+
+//给返回值起一个变量名，Go推荐写法
+func MyFunc2() (result int) {
+	result = 777
+	return //这里直接return，因为知道要返回result的值，当然直接写return 777也可以
+}
+```
+
+定义无参数、有多个返回值的函数：
+```go
+func MyFunc3() (int, int, int) {
+	return 1, 2, 3
+}
+
+//推荐写法，为返回值起名
+func MyFunc3() (a, b, c int) {
+	a, b, c = 1, 2, 3
+	return
+}
+```
+
 ### 02 递归函数
 ### 03 函数类型
 ### 04 匿名函数与闭包
