@@ -423,12 +423,233 @@ func MyFunc3() (a, b, c int) {
 ```
 
 ### 02 递归函数
+递归函数没什么特别的，注意递归终止条件即可。
+```go
+//示例1：打印1到正整数n
+func main() {
+	test(4)
+}
+
+func test(a int) {
+	if a <= 0 {
+		return
+	}
+	test(a - 1)
+	fmt.Println("a = ", a)
+}
+
+//示例2：求1+2+...+n
+func main() {
+	fmt.Println("result = ", add(4))
+}
+
+func add(n int) int {
+	if n <= 0 
+		return 0
+	return n + add(n -1)
+}
+```
+
 ### 03 函数类型
+在Go语言中，函数也是一种数据类型，同样可以使用`type`关键字来定义。它的类型就是拥有相同参数、相同返回值的一种类型。使用自定义的函数类型我们可以实现多态与函数回调。
+```go
+package main
+
+import "fmt"
+
+//例如我可以定义一种整数二则运算的类型
+type FuncType func(int, int) int
+
+func main() {
+	var (
+		operand1, operand2 int
+		f FuncType
+	)
+
+	operand1, operand2 = 5, 3
+	f = MyMod //f可以是任何满足FuncType定义的函数，这就是一种多态的体现
+	
+	//当然直接写result := f(operand1, operand2)也可以，那就体现不出回调了
+	result := InvokeCalculation(operand1, operand2, f) 
+	fmt.Println("result =", result)
+}
+
+//调用时只关心f是一个FuncType类型的函数，可以处理两个整形操作数并返回一个整形值
+func InvokeCalculation(o1, o2 int, f FuncType) int {
+	fmt.Println("Invoking function f...")
+	return f(o1, o2)
+}
+
+func MyAdd(o1, o2 int) int {
+	return o1 + o2
+}
+
+func MyMod(o1, o2 int) int {
+	return o1 % o2
+}
+```
+通过使用函数类型，我们可以将函数作为另一个函数的参数，从而实现函数的回调（正如上面的InvokeCalculation函数）。使用回调极大地提升了函数的可扩展性。
+
+:::tip
+作为对比，Java中实现方法的回调需要用到的参数是类或接口的实例，通过instance.method(operand)来实现回调。
+:::
+
 ### 04 匿名函数与闭包
+所谓闭包就是一个函数“捕获”了和它在同一作用域的其他变量常量。这就意味着无论在什么地方当闭包被调用的时候，闭包都能使用这些变量常量。它不关心这些量是否已经超出了作用域，只要闭包还在使用他们，他们就还会存在。
+
+在Go中，闭包是通过匿名函数来实现的。（正如同Java中内部类可以访问外部类的成员变量或外部方法的局部变量，匿名内部类可以访问外部方法用final修饰的局部变量）
+
+```go
+//其中的匿名函数和外部函数形成了闭包
+func main() {
+	a := 10
+	b := 20
+	str := "mike"
+
+	//匿名函数，没有名字，只是定义还没有调用
+	f1 := func() { //这里通过自动推导给匿名函数命了名
+		fmt.Println("a = ", a)
+		fmt.Println("str = ", str)
+	}
+	f1() //调用
+
+	//写法2：定义并同时调用
+	func() {
+		fmt.Printf("a = %d, str = %s\n", a, str)
+	}() //这个括号表示给该函数传参，不过我们定义的函数没有参数所以括号内没有内容
+
+	//例3：定义有参数有返回值的匿名函数并同时调用
+	x, y := func(i, j int) (max, min int){
+		if i > j {
+			max = i
+			min = j
+		}else {
+			max = j
+			min = i
+		}
+		return
+	}(a, b)
+	fmt.Println(x, " ", y)
+}
+```
+
+Go语言中闭包是以**引用**的方式捕获外部变量，在匿名函数中修改外部变量后，外部函数中看到的变量是修改后的。（不像Java中final关键字从设计上让匿名内部类看到的只是外部变量的**拷贝**）
+```go
+//返回值为一个匿名函数，该函数没有参数，返回值为int类型
+func squares() func() int {
+	var x int //没有初始化，值为0
+	return func() int {
+		x++
+		return x * x
+	}
+}
+
+func main() {
+	//用变量f接收这个匿名函数/闭包函数
+	f := squares()
+	fmt.Println(f()) //1，首次调用后x=1，并且return后依然存在（普通函数调用后变量就被回收了）
+	fmt.Println(f()) //4
+	fmt.Println(f()) //9
+
+	f = squares() //再次生成x并返回新的匿名函数，这时重复执行打印会得到1，4，9，16，...
+}
+```
+上面的例子说明，闭包使用的外部变量的生命周期不由它的作用域决定。对squares()的一次调用会生成一个局部变量x并返回一个匿名函数，之后变量x仍然隐式存在于f中。
+
 ### 05 延迟调用defer
+Go中的defer类似于C++中的析构函数，用于在调用结束前做一些收尾清理的工作，例如关闭文件、网络连接等。defer语句只能放在函数的内部，但不要求放在源代码的结尾。
+```go
+func main() {
+	defer fmt.Println("closing...") //这一句会在最后执行
+	fmt.Println("working...")
+}
+```
+如果有多个defer语句，在源代码中先写的后被执行（LIFO）。如果某行普通语句在运行时发生错误，在其之前的defer语句依旧会被执行（之后的defer语句不会）。如果某个延迟调用语句在运行时发生错误，其余的调用依旧会被执行。
+
+延迟执行类似于在从上往下执行代码时，遇到defer就把该语句放入某个栈中，当程序运行结束或遇到异常退出时，会把已经在栈中的语句取出执行（所以错误之后的defer语句不会执行）。
+
+defer和匿名函数结合使用：
+```go
+func main() {
+	a := 10
+	b := 20
+	
+	defer func(){ //由于是延迟执行，所以调用匿名函数时捕获到的a、b已经是修改后的值
+		fmt.Printf("a = %d, b = %d\n", a, b)
+	}()
+
+	defer func(x, y int){ //如果这里把匿名函数的形参写成(a, b int)那么下一行打印的就是形参而非外部的a和b
+		fmt.Printf("a = %d, b = %d\n", a, b) //外部的a和b
+		fmt.Printf("参数x = %d, y = %d\n", x, y) //传进来的参数的值
+	}(a, b) //注意在延迟执行时，已经传递的参数是当时未修改的a和b的值
+
+	a = 111
+	b = 222
+	fmt.Printf("a = %d, b = %d\n", a, b)
+}
+```
+
 ### 06 获取命令行参数
+要获取用户从命令行传递的参数，需要导入`os`这个包：
+```go
+import (
+	"fmt"
+	"os"
+)
+
+func main() {
+	list := os.Args
+	n := len(list)
+	fmt.Println("参数个数：", n)
+}
+```
+我们使用go build命令编译得到可执行文件如program，那么在命令行下执行`program arg1 arg2`，程序名本身也是一个参数，所以一共有三个参数。
+
+os.Args本质是`var Args []string`，所以可以通过for迭代遍历（list[i]/range）。
+
 ### 07 作用域
+和多数语言一样，Go语言中在`{}`内的变量是局部变量，定义在函数外部的变量是全局变量（需要使用var定义，不可以自动推导）。变量重名时优先使用局部变量。
+
 ### 08 工程管理
+**一**，Go代码必须要放在工作区中。工作区其实是一个对应特定工程的目录，包含三个子目录:
+* src，必须，用于以代码包的形式组织并保存Go源码文件。
+* pkg，非必须，用于存放经由go install命令构建安装后的代码包。
+* bin，非必须，用于存放经由go install命令安装后生成的可执行文件。
+
+需要注意的是，环境变量GOPATH中如果只有一个工作区的路径时，go install命令才会安装到该目录的bin目录下，否则需要设置GOBIN环境变量。
+
+为了能构建某个工程，需要先把工程的根目录加到环境变量GOPATH中，否则代码之间无法通过绝对代码包路径完成调用。注意设置环境变量时Linux下的分隔符是冒号，Windows下的分隔符是分号。
+
+**二**，需要了解一些关于包的使用方式。
+```go
+//导入时使用.可以在后面使用包中的函数或全局变量时，无需指定包名。类似于Java的静态导入
+//但要少使用这种方法，因为可能会和自己定义的函数、变量重名
+import . "fmt"
+import . "os"
+
+func main() {
+	Println("hello world")
+	Println("os.Args = ", Args)
+}
+```
+```go
+//导入包时还可以给包起别名
+import io "fmt"
+
+//导入时可以忽略某个包，编译可以通过。其本质是仅调用该包里的init函数
+import _ "fmt"
+
+func main() {
+	io.Println("hello world")
+}
+```
+
+同一个目录下的.go文件中的包名必须一样。同一个目录下，调用别的文件中的函数无需包名引用。
+
+不同的目录，包名不一样。调用不同包的函数，首先要导入该包，并且该函数首字母要大写。
+
+所有用Go编译的单个可执行程序都必须有且仅有一个叫main的包，main包中必须有一个main函数用作程序入口。另外Go还有一个保留的函数init()，这两个函数在定义时都不能有任何参数和返回值。虽然一个package中可以有多个init函数，但从可读性、可维护性的角度出发建议每个package中只写一个init函数。Go程序运行时会自动调用main和init函数（后者在前者之前执行，导入包的init函数在main包的init函数之前执行）
+
 
 ## 第三章 复合类型
 ### 01 指针
