@@ -710,6 +710,116 @@ func TrueSwap(a, b *int){
 ```
 
 ### 02 数组
+数组的概念大家都不陌生，Go中定义数组的示例为：
+```go
+func main() {
+	var array [10]int
+
+	for i := 0; i < len(array); i++ {
+		array[i] = i + 1 //操作数组时的下标可以是变量
+		fmt.Printf("array[%d] = %d\n", i, array[i])
+	}
+}
+```
+数组的长度必须是常量（不可以是变量），且是类型的组成部分，`[2]int`和`[3]int`是不同的类型。在Java中我们可以这样写：
+```java
+public static void main(String[] args) {
+	int n = 10;
+	int[] array = new int[n];
+	System.out.println(array.length);
+	n = 20;
+	//...
+}
+```
+但Go中就不可以，n必须是一个常量：
+```go
+func main() {
+	const n int = 10
+	var arr [n]int
+	fmt.Println(len(arr))
+}
+```
+我们可以在声明时就对数组进行初始化（对比Java中可以`int[] arr = new int[]{1, 2, 3};`）：
+```go
+func main() {
+	var array [3]int = [3]int{1, 2, 3} //和变量一样如果直接赋值则前面的类型可以省略
+	//array := [3]int {1, 2, 3}
+	fmt.Println("array = ", array)
+
+	//Go中可以对数组进行部分初始化，未初始化的元素为默认值
+	array2 := [5]int{1, 2, 3} //第0~2个元素被初始化，第3~4个元素默认为0
+	fmt.Println("array2 = ", array2)
+
+	//Go中还可以指定某个位置的元素初始化
+	array3 := [5]int{2: 10, 4: 20} //只初始化了下标为2和4的元素
+	fmt.Println("array3 = ", array3)
+}
+```
+多维数组示例：
+```go
+func main() {
+	var arr [3][4]int
+	count := 0
+
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 4; j++ {
+			arr[i][j] = count
+			count++
+		}
+	}
+
+	fmt.Println(arr)
+
+	arr2 := [3][4]int{{0, 1, 2, 3}, {4, 5, 6, 7}, {8, 9, 10, 11}} //初始化
+	arr3 := [3][4]int{{0, 1, 2}, {4, 5, 6}, {8, 9}} //部分初始化
+	arr4 := [3][4]int{{0, 1, 2}, {4, 5, 6}} //部分初始化
+	arr5 := [3][4]int{1: {4, 5, 6, 7}} //指定初始化第1行
+	arr6 := [3][4]int{1: {1: 5, 3: 7}} //指定初始化第1行中的第1、3列
+	//使用这些数组...
+}
+```
+Go语言中的数组原生支持用==或!=比较，要求被比较的数组类型一样。（对比Java中只能用Arrays.equals(arr1,arr2)方法来比较）另外，数组也可以通过等号直接用于给同类型的数组赋值。（对比Java中只能用Arrays.copyOf或者System.arrayCopy方法，如果使用等号则仅仅是创建了原数组的一个引用）：
+```go
+func main() {
+	a := [5]int{1, 2, 3, 4, 5}
+	b := [5]int{1, 2, 3, 4, 5}
+	fmt.Println("a == b? ", a == b)
+
+	//c := a
+	var c [5]int
+	c = a
+}
+```
+数组如果用作函数的参数，那么是值传递，形参是实参的一份拷贝。如果想要修改同一个数组那么就需要传递指针。
+```go
+func modify(arrPointer *[5]int) {
+	(*arrPointer)[0] = 666
+	fmt.Println("Original array modified.")
+}
+```
+
+拓展：随机数的使用：
+```go
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+func DoRand()  {
+	//设置种子，种子固定后每次运行产生的随机数序列也是固定的（伪随机）
+	rand.Seed(666)
+	//可以用当前时间作为种子，那么每次运行结果是不一样的
+	//rand.Seed(time.Now().UnixNano())
+
+	//产生随机数
+	for i := 0; i < 5; i++ {
+		fmt.Println("rand = ", rand.Int()) //产生非负的随机整数，范围较大
+		fmt.Println("rand = ", rand.Intn(100)) //产生限定范围的整数
+	}
+}
+```
+
 ### 03 slice
 ### 04 map
 ### 05 结构体
