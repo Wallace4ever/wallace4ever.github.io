@@ -881,7 +881,84 @@ func main() {
 ```
 map是无序的，当map中的元素超过初始长度时会自动扩容。
 
+遍历map时可以使用range迭代遍历，但注意遍历的结果是无序的：
+```go
+func main() {
+	m := map[int]string{1:"mike", 2:"wallace"}
+	for key, value := range m {
+		fmt.Println("key is:", key, "value is:", value)
+	}
+}
+```
+要判断一个key是否存在，可以通过下面的方式：
+```go
+func main() {
+	m := map[int]string{1:"mike", 2:"wallace"}
+	value, ok := m[3]
+	if ok == true {
+		fmt.Println("m[3]=", value)
+	}else {
+		fmt.Println("key does not exist!")
+	}
+}
+```
+要删除某一个key值，可以使用delete(map, key)函数来实现。map在传参时是引用传递。
+
 ### 05 结构体
+有时我们需要将不同类型的数据组合成一个整体，在Java中我们直接使用Java对象的属性，在Go中就可以使用结构体（和C类似）。结构体的定义语法为：
+```go
+type Student struct {
+	id int //结构体成员前没有var关键字
+	name string
+	sex byte
+	age int
+}
+```
+有了上面的定义后我们就可以在函数中使用结构体并进行初始化：
+```go
+func main() {
+	//顺序初始化，每个成员必须初始化
+	var s1 Student = Student{1, "mike", 'm', 18}
+	fmt.Println("s1 = ", s1)
+
+	//指定成员初始化，没有初始化的自动赋值为0
+	s2 := Student{name: "mike", age: 18}
+	fmt.Println("s2 = ", s2)
+}
+```
+涉及到指针操作时，和上面提到的无异：
+```go
+func main() {
+	var p1 *Student = &Student{1, "mike", 'm', 18}
+	fmt.Println("s1 = ", *p1)
+}
+```
+操作结构体的成员时，要使用`.`运算符：
+```go
+func main() {
+	var s Student
+	s.id = 1
+	s.name = "mike"
+	s.sex = 'f'
+	s.age = 19
+
+	//通过指针来操作成员时，p.id和(*p).id完全等价
+	var p *Student
+	p = &s
+	p.id = 2
+	(*p).sex = 'm'
+	p.age = 20
+	fmt.Println("Student info:", *p)
+
+	//也可以通过new来申请一块内存创建结构体
+	p2 := new(Student)
+}
+```
+类似于数组，结构体也是可以比较和赋值的，当然前提是必须要是同类型的结构体，并且只能比较相等和不相等。
+
+结构体直接作为函数参数传递时是值传递，针对形参的修改不能对实参产生影响。如果使用指针作为参数即可对实参进行修改（地址传递/引用传递）。
+
+值得注意的是，跨包使用结构体时需要使用`包名.结构体名`的方式来使用，并且结构体名称的首字母需要大写、成员名称首字母也需要大写（小写的话跨包就不可见了）。
 
 ## 第四章 实现面向对象特性
 ### 01 匿名组合（继承）
