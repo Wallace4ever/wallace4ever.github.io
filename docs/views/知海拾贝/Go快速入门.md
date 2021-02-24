@@ -961,7 +961,91 @@ func main() {
 值得注意的是，跨包使用结构体时需要使用`包名.结构体名`的方式来使用，并且结构体名称的首字母需要大写、成员名称首字母也需要大写（小写的话跨包就不可见了）。
 
 ## 第四章 实现面向对象特性
+Go虽然**简洁优雅**地支持了面向对象编程，但是它并没有沿袭传统面向对象编程中的诸多概念，例如封装继承多态，Go语言通过别的方式实现这些特性：
+* 封装：通过方法实现
+* 继承：通过匿名字段实现
+* 多态：通过接口实现
+
 ### 01 匿名组合（继承）
+一、关于结构体匿名字段，来看一下这个例子：
+```go
+//人
+type Person struct {
+	name string
+	sex byte
+	age int
+}
+
+//学生
+type Student struct {
+	Person //匿名字段，只有类型没有名字。学生包含了人的所有字段，实现了继承
+	id int
+	addr string
+}
+
+//我们来使用学生结构体
+func main() {
+	//顺序初始化
+	var s1 Student = Student{Person{"mike", 'm', 18}, 1, "nanjing"}
+	fmt.Printf("s1: %+v\n", s1)
+
+	//也可以指定成员初始化
+}
+```
+如果要使用匿名字段中的成员，直接使用即可：
+```go
+func main() {
+	fmt.Println(s1.name, s1.sex, s1.age, s1.id, s1.addr)
+	s1.Person = Person{"judy", 'f', 19}
+	s1.id = 2
+}
+```
+如果在匿名组合的两个结构体间有同名字段，则默认采用就近原则，除非显式调用（例如s.Person.name）。
+
+二、关于非结构体匿名字段，看下面的例子：
+```go
+type mystr string
+//人
+type Person struct {
+	name string
+	sex byte
+	age int
+}
+
+//学生
+type Student struct {
+	Person 
+	int
+	mystr
+}
+
+func main() {
+	s := Student{Person{"mike", 'm', 18}, 27, "haha"}
+	fmt.Println(s.name, s.age, s.sex, s.int, s.mystr)
+}
+```
+只能做顺序初始化，没法指定匿名成员初始化。
+
+另外，指针类型也可以作为结构体的成员，初始化的时候取对应类型变量的地址或使用new()即可：
+```go
+type Student struct {
+	*Person
+	id int
+	addr string
+}
+
+func main() {
+	var s2 Student
+	//s1 := Student{&Person{"wallace", 'm', 18}, 22, "nanjing"}
+	s2.Person = new(Person) //注意不是s2.*Person
+	s2.name = "wallace"
+	s2.sex = 'm'
+	s2.age = 18
+	s2.id = 22
+	s2.addr = "nanjing"
+}
+```
+
 ### 02 方法（封装）
 ### 03 接口（多态）
 
