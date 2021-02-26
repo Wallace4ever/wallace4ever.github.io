@@ -1118,6 +1118,106 @@ func main() {
 ```
 
 ### 03 接口（多态）
+在Go中接口有以下特点：
+* 接口命名习惯以er结尾
+* 接口只有方法声明，没有实现，没有数据字段
+* 接口可以匿名嵌入其它接口，或者嵌入到结构中
+
+示例：
+```go
+type Manner interface {
+	SayHi()
+}
+
+type Student struct {
+	name string
+	id int
+}
+
+type Teacher struct {
+	name string
+	id int
+	division int
+}
+
+func (s *Student) SayHi() {
+	fmt.Println("My name is: ", s.name)
+}
+
+func (t *Teacher) SayHi() {
+	fmt.Printf("My name is: %s, my division number is: %d\n", t.name, t.division)
+}
+
+func main() {
+	//定义接口类型的变量，只要是实现了此接口方法的类型，那么这个类型的变量就可以给i赋值
+	var i Manner
+
+	s := &Student{"mike", 201}
+	i = s
+	i.SayHi()
+
+	t := &Teacher{"judy", 102, 3}
+	i = t
+	i.SayHi()
+
+	ShowManner(s)
+	ShowManner(t)
+
+	x := make([]Manner, 3)
+	x[0] = s
+	x[1] = t
+	for _, implementation := range x {
+		implementation.SayHi()
+	}
+}
+
+func ShowManner(i Manner) {
+	//some codes..
+	i.SayHi()
+}
+```
+上面的程序中，Student和Teacher都实现了接口Manner中的方法，那么接口类型变量i就可以被赋值为两者的实例。如果我们编写的函数的参数中有接口类型，那么根据传入的接口实例的不同就会有不同的表现，这就是多态的一种体现。
+
+接口的嵌入（继承）：和结构体中的匿名字段一样，接口中也可以匿名嵌入另一个接口以实现继承。被继承的接口称为子集接口，继承之的接口称为超集接口。
+
+实现了超集接口的变量可以转换为子集接口的变量，反之则不可以。这一点符合面向对象设计原则中的里氏代换原则。
+
+空接口：空接口中不包含任何方法，因此所有类型都实现了空接口，从而空接口类型的变量可以存储任意类型的数值。如果我们需要函数可以接受任意类型的对象实例时，我们会将其声明为interface{}，最典型的是标准库中Print系列的函数：
+```go
+func Printf(fmt string, args ...interface{})
+```
+
+如果我们由于需要得使用空接口，但又要在使用具体数据时要知道其类型，可以通过if或者switch实现断言。例：
+```go
+func main() {
+	i := make([]interface{}, 3)
+	i[0] = 1
+	i[1] = "hello"
+	i[2] = Student{"mike", 18}
+
+	//类型查询，类型断言
+	for index, data := range i {
+		//第一个返回值是接口变量本身，第二个返回值是判断结果的真假
+		if value, ok := data.(int); ok == true {
+			fmt.Printf("x[%d]类型为int，内容为%d\n", index, value)
+		}else if value, ok := data.(string); ok == true {
+			//...
+		}else {
+			//...
+		}
+	}
+
+	for index, data := range i {
+		switch value := data.(type) {
+			case int :
+				fmt.Printf("x[%d]类型为int，内容为%d\n", index, value)
+			case string:
+				//...
+			
+		}
+	}
+}
+```
 
 ## 第五章 异常、文本文件处理
 ### 01 error接口、panic、recover
