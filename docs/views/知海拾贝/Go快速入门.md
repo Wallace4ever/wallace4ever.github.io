@@ -1047,6 +1047,76 @@ func main() {
 ```
 
 ### 02 方法（封装）
+我们有了结构体和匿名字段之后可以表示对象的属性，但对象有时还需要对外提供可以操作的方法（或者说接口）。和普通函数不同，在定义方法时还需要在函数名前加上要绑定的类型。
+```go
+type myint int
+
+//这里的obj叫做接收者，接收者就是传递的一个参数
+func (obj myint) Add(num myint) myint { //这时myint类型的对象就有了这样的方法
+	return obj + num
+}
+
+func main() {
+	var a myint = 2
+	result := a.Add(3)
+	fmt.Println("result = ", result)
+}
+```
+这里我认为类似于Java反射包中Method类的invoke(Object obj, Object... args)方法，针对某种方法传入所需类型的对象以及需要的参数。
+
+从Go的角度出发，面向对象实质上是换了一种表示形式。上面的例子中我们只是对重定义的基本类型（类似于Java中的包装类型）绑定了方法，当然我们可以为结构体类型绑定方法，如果要修改结构体则是为结构体指针类型绑定方法。例子：
+```go
+type Person struct {
+	name string
+	sex byte
+	age int
+}
+
+//值传递，只是一份拷贝
+func (p Person) ShowInfo() {
+	fmt.Println("Person info:", p)
+}
+
+//引用传递，可以修改
+func (p *Person) SetInfo(n string, s byte, a int) {
+	p.name = n
+	p.sex = s
+	p.age = a
+}
+
+func main() {
+	p1 := Person{"mike", 'm', 18}
+	p1.ShowInfo()
+
+	var p2 Person
+	(&p2).SetInfo("wallace", 'm', 20)
+	p2.ShowInfo()
+}
+```
+注意，可以给任意自定义类型（基本类型、结构体）添加方法，但如果自定义的类型本身就是指针类型那么就不能添加方法。
+
+一个类型的方法集指的是可以被该类型的值所调用的所有的方法的集合。不过，同一个类型的实例value和指针pointer调用方法时不受方法集的约束，编译器会查找全部方法并自动转换。例如上面的代码中使用`p1.SetInfo("wallace", 'm', 20)`和`(&p2).ShowInfo()`都是可以的。
+
+方法的继承：在前面的例子中，Student继承了Person，加入我们有绑定Person类型的方法`func (p *Person) ShowInfo(){}`，那么Student类型的变量也可以调用这个方法，这就是方法的继承。
+
+方法的重写：如果Student类型也绑定了一个同名同参数的方法`func (p *Student) ShowInfo(){}`，那么这就是方法的重写，或者说覆盖。那么通过`s.ShowInfo()`调用的根据就近原则就会优先调用重写的方法。此外，可以显示地通过`s.Person.ShowInfo()`来调用继承的方法。
+
+小技巧，使用**方法值**保存方法的入口地址，可以在调用方法时无需再传递接收者更为简便：
+```go
+func main() {
+	pFunc := p.ShowInfo //没有括号，保存了方法的入口地址
+	pFunc() //等价于p.ShowInfo()
+}
+```
+**方法表达式**：方法值是隐藏了接收者，而方法表达式则是直接通过类型调用其绑定的方法：
+```go
+func main() {
+	p := new(Person)
+	f := (*Person).SetInfo //没有括号，保存类型入口
+	f(&p) //显式地把接收者传递过去
+}
+```
+
 ### 03 接口（多态）
 
 ## 第五章 异常、文本文件处理
