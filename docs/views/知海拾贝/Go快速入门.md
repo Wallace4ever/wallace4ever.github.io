@@ -1221,6 +1221,67 @@ func main() {
 
 ## 第五章 异常、文本文件处理
 ### 01 error接口、panic、recover
+一、创建error：
+```go
+package main
+
+import (
+	"fmt"
+	"errors"
+)
+
+func main() {
+	var err1 error = fmt.Errorf("%s", "this is a normal error!")
+	fmt.Println(err1)
+
+	err2 := errors.New("this is error 2")
+}
+```
+实际的例子，使用error来避免错误：
+```go
+func Div(a, b int) (result int, err error) {
+	err = nil
+	if b == 0 {
+		err = errors.New("分母不能为0！")
+	} else {
+		result = a / b
+	}
+	return
+}
+
+func main() {
+	result, err := Div(10, 0)
+	if err != nil{
+		fmt.Println(err)
+	} else {
+		fmt.Println("result = ", result)
+	}
+}
+```
+
+二、panic。Go中的error类似于Java中的Exception，panic类似于Java中的Error。当panic发生时（例如数组越界或空指针），程序会中断运行并立即执行该goroutine中被defer延迟的函数，随后程序崩溃并输出日志信息。
+
+在少数情况下我们会显式调用`panic("message")`函数来触发panic。
+
+三、recover。panic会导致程序崩溃，有时候我们不希望程序崩溃，那么就可以使用recover。recover必须要在被defer延迟调用的函数中才有效。
+```go
+func testRecover(x int) {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	var a [10]int
+	a[x] = 123
+}
+
+func main() {
+	testRecover(9)
+	testRecover(12)
+}
+```
+
 ### 02 字符串处理
 ### 03 正则表达式
 ### 04 JSON处理
