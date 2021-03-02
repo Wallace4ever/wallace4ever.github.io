@@ -1283,8 +1283,212 @@ func main() {
 ```
 
 ### 02 字符串处理
+strings包中有很多有用的字符串处理相关的函数，实现了分割、拼接、寻找子串等功能，我们直接根据例子来看一下：
+```go
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	//Contains查找是否包含子串
+	fmt.Println(strings.Contains("hellogo", "hello")) //true
+
+	//Joins组合切片中所有的字符串
+	words := []string{"abc", "hello", "world"}
+	buf := strings.Joins(words, ":") //使用冒号作为分隔符
+	fmt.Println(buf)
+
+	//Index查看子串的开始位置
+	fmt.Println(strings.Index("abcdhello", "hello")) //4，不存在则返回-1
+
+	//Repeat重复拼接字符串
+	buf = strings.Repeat("go", 3) //"gogogo"
+
+	//Split以指定的分割符拆分字符串成一个切片
+	words2 := strings.Split(buf, "o")
+
+	//Trim去掉字符串首尾指定的字符
+	buf = strings.Trim("   R U OK   ", " ")
+	fmt.Println(buf)
+
+	//Fields去掉空格，把元素放入切片中
+	words3 := strings.Fields("   R U OK   ") //得到切片["R", "U", "OK"]
+}
+```
+
+strconv包提供了字符串转换相关的函数，我们来看一些例子：
+```go
+package main
+
+import (
+	"fmt"
+	"strconv"
+)
+
+func main() {
+	//转换为字符串后追加到字节数组
+	slice := make([]byte, 0, 1024)
+	slice = strconv.AppendBool(slice, true)
+	slice = strconv.AppendInt(slice, 1234, 10)以10进制格式添加1234
+	slice = strconv.AppendQuote(slice, "hello world")
+
+	fmt.Println("slice = ", string(slice)) //转换成string后再打印
+
+	//其他类型转换为字符串
+	var str string
+	str = strconv.FormatBool(false)
+	str = strconv.FormatFloat(3.14, 'f', -1, 64) //打印格式以小数方式，float64，紧缩模式
+	str = strconv.Itoa(666) //整形转字符串
+
+	if flag, err := strconv.ParseBool("true"); err == nil {
+		fmt.Println("flag = ", flag)
+	} else {
+		fmt.Println("err = ", err)
+	}
+
+	a, _ := strconv.Atoi("567")
+	fmt.Println("a = ", a)
+}
+```
+
 ### 03 正则表达式
+正则表达式是一种进行模式匹配和文本操纵的强大工具，Go语言通过regexp标准包实现了对正则表达式的支持。采用RE2语法，和多数语言基本一致，关于正则表达式具体的用法这里就不展开了。示例：
+```go
+package main
+
+import "fmt"
+import "regexp"
+
+func main() {
+	buf := "abc  axc tac"
+
+	//1) 编译规则，编译成功则返回*Regexp类型的变量（解释器），失败则触发panic返回空
+	reg1 := regexp.MustCompile(`a.c`)
+	if reg1 == nil {
+		fmt.Println("err")
+		return
+	}
+
+	//2) 根据规则提取关键信息
+	result1 := reg1.FindAllStringSubmatch(buf, -1/*要找出的数量，-1表示找到所有满足的*/)
+	fmt.Println("result1 = ", result1)
+}
+```
+正则表达式的处理效率没有strings包提供的字符串处理函数效率高，简单的字符串处理尽量使用strings包的函数，有复杂的需求再使用regexp包。
+
 ### 04 JSON处理
+JSON（JavaScript Object Notation）是一种比XML更轻量级的数据交换格式，是一种理想的跨平台跨语言的数据交换语言，我们可以在www.json.cn上测试自己的JSON。Go语言通过内置的"encoding/json"包实现JSON的生成（编码）与解析（解码）。
+
+一、通过结构体生成JSON：
+```go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+type INFO struct {
+	Company string
+	Subjects []string
+	Isok bool
+	Price float64
+}
+
+func main() {
+	s := INFO{"SEU", []string{"Java", "Python", "Go"}, true, 666.66}
+
+	//编码，根据内容生成JSON文本
+	buf, err := json.Marshal(s)
+
+	//为了让最后看起来的结果有缩进便于阅读，编码时还可以使用另一个接口，参数分别为空串和Tab字符
+	//buf, err := json.MarshalIndent(s, "", "	")
+
+	if err != nil {
+		fmt.Println("err = ", err)
+		return
+	}
+	fmt.Println(string(buf)) //需要转成字符串，否则打印的是ASCII码
+	
+}
+```
+注意，为了能让结构体被json包使用，结构体成员名的首字母必须大写，如果想要让编码后的对应首字母小写，可以使用struct tag声明：
+```go
+type INFO struct {
+	Company string `json:"-"` //此字段不会输出
+	Subjects []string `json:"subjects"` //二次编码为小写
+	Isok bool `json:",string"` //转换成字符串类型再编码
+	Price float64 `json:",string"`
+}
+```
+
+二、通过map生成JSON：
+```go
+func main() {
+	//创建map
+	m := make(map[string]interface{}, 4)
+	m["company"] = "SEU"
+	m["subjects"] = []string{"Java", "Python", "Go"}
+	m["isok"] = true
+	m["price"] = 666.66
+
+	//编码成JSON
+	result, err := json.Marshal(m)
+	if err != nil {
+		fmt.Println("err = ", err)
+		return
+	}
+	fmt.Println(string(result))
+}
+```
+
+三、JSON解析到结构体：
+```go
+func main() {
+	jsonbuf := `...`/*JSON文本*/
+	var obj INFO
+	err := json.Unmarshal([]byte(jsonbuf)/*先转为字节数组*/, &obj/*地址传递才能写入*/)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("obj: ", obj)
+}
+```
+如果只想解析部分字段，那么可以再定义一个只有需要的字段的结构体，再解析。这样只会解析需要的字段到结构体中。
+
+四、JSON解析到map：
+```go
+func main() {
+	jsonbuf := `...`/*JSON文本*/
+	m := make(map[string]interface{}, 4)
+	err := json.Unmarshal([]byte(jsonbuf), &m)
+		if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Printf("m: %+v\n", m)
+
+	//类型断言
+	for key, value := range m {
+		switch data := value.(type){
+			case string:
+				fmt.Printf("map[%s]的value类型为string，value为：%s\n", key, value)
+			case bool:
+				fmt.Printf("map[%s]的value类型为bool，value为：%v\n", key, value)
+			case float64:
+				fmt.Printf("map[%s]的value类型为float64，value为：%v\n", key, value)
+			case []interface{}:
+				fmt.Printf("map[%s]的value类型为[]interface{}，value为：%v\n", key, value)
+		}
+	}
+}
+```
+由于map使用的是万能指针，所以实际解析完之后想要使用map中的数据还需要使用类型断言才可以；而解析到结构体中由于类型已经确定所以使用起来更简单。
+
 ### 05 文件操作
 
 ## 第六章 并发编程
