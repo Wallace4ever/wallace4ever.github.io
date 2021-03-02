@@ -1490,6 +1490,80 @@ func main() {
 由于map使用的是万能指针，所以实际解析完之后想要使用map中的数据还需要使用类型断言才可以；而解析到结构体中由于类型已经确定所以使用起来更简单。
 
 ### 05 文件操作
+文件操作需要用到os包。
+
+一、建立与打开文件:
+
+可通过下面两个函数新建文件或覆盖原有文件：
+```go
+//根据文件名创建，返回文件对象（默认权限0666）和是否有错误，调用了OpenFile()
+func Create(name string) (file *File, err Error)
+
+//根据文件描述符创建相应文件，返回文件对象
+func NewFile(fd uintptr, name string) *File
+```
+通过下面两个函数来打开文件：
+```go
+func Open(name string) (file *File, err Error) //实际上调用了OpenFile()
+
+//flag是打开方式，perm是权限permission
+func OpenFile(name string, flag int, perm uint32) (file *File, err Error)
+```
+
+二、读写文件：
+
+当我们通过上面的方法拿到File对象（指针）后就可以进行文件的读写操作了。下面是文件类型绑定的方法：
+
+```go
+//1.写文件
+//将字节切片写入到文件
+func (file *File) Write(b []byte) (n int, err Error)
+//在指定偏移处写入字节类型的信息
+func (file *File) WriteAt(b []byte, off int64) (n int, err Error)
+//写入string类型的信息到文件
+func (file *File) WriteString(s string) (ret int, err Error)
+
+//2.读文件
+//读文件到字节切片中
+func (file *File) Read(b []byte) (n int, err Error)
+//从指定位置读
+func (file *File) ReadAt(b []byte, off int64) (n int, err Error)
+```
+记得使用完文件之后需要通过file.Close()将文件资源关闭，或者defer之。
+
+三、借助bufio包实现按行读取内容。由于上面使用os包自带的读写函数是直接操作字节数据，在读取文本文件时可以使用带缓冲的IO：
+```go
+import (
+	"fmt"
+	"os"
+	"io"
+	"bufio"
+)
+
+func ReadFileByLine(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	defer f.close()
+
+	//通过reader读缓冲区中的内容
+	reader := bufio.NewReader(f)
+	for {
+		buf, err := r.ReadBytes('\n') //遇到行尾结束读取，包括读取'\n'
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			fmt.Println(err)
+		}
+
+		fmt.Printf("该行内容为: %s", string(buf))
+	}
+}
+```
 
 ## 第六章 并发编程
 ### 01 概述
