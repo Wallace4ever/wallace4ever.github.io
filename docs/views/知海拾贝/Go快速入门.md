@@ -1567,7 +1567,68 @@ func ReadFileByLine(path string) {
 
 ## 第六章 并发编程
 ### 01 概述
+说一个很常见的问题：并行与并发的区别。并行（parallel）指的是：同一微观时刻有多条指令在多个处理器（内核）上执行；并发（concurrent）指的是同一时刻一个处理器上只能有一条指令在执行，但多个任务队列交替使用该处理器，在宏观上显得是多任务同时执行。
+
+Go语言在语言层面就支持了并发。其相关的API是基于CSP（communicating sequential processes，顺序通信进程）模型，这意味着显式的锁是可以避免的，从而简化了程序的编写。
+
 ### 02 goroutine
+goroutine（协程）是比线程更小的单位，十几个goroutine可能体现在操作系统底层就是五六个线程，Go语言内部实现了goroutine之间的内存共享，执行之只需要极少的栈内存。
+
+程序启动时，其主函数main在一个单独的goroutine中运行，称为main goroutine。示例：
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func newTask() {
+	for {
+		fmt.Println("This is a new task.")
+		time.Sleep(time.Second)
+	}
+}
+
+func main() {
+	go newTask() //新建携程执行该任务，之后主协程继续往下执行
+	go func() {
+		//也可以调用匿名函数
+	}()
+
+	for {
+		fmt.Println("This is main goroutine.")
+		time.Sleep(time.Second)
+	}
+
+	//主协程退出时，其他子协程也要跟着退出
+}
+```
+由于主协程退出时，其他子协程也要跟着退出，所以开发者要注意不要让子协程还没来得及运行主协程就退出。
+
+**runtime包的一些重要函数：**
+
+runtime.Gosched()用于让出CPU时间片，使得调度器安排其他等待中的任务运行，并再下次某个时候从该位置恢复执行。（类似于Java中Thread类中的yield()方法）
+```go
+func main() {
+	go func() {
+		for i := 0; i < 5; i++ {
+			fmt.Println("go")
+		}
+	}
+
+	for i := 0; i < 2; i++ {
+		//如果不作处理的话主goroutine先执行，执行完毕后退出，导致子协程来不及执行
+		runtime.Gosched()
+		fmt.Println("hello")
+	}
+}
+```
+
+runtime.Goexit()将立即终止当前goroutine执行，调度器会确保所有以通过defer注册的延迟调用被执行。
+
+runtime.GOMAXPROCS(n int)用来设置可以并行计算的CPU内核数的最大值，参数为指定的内核数，返回值为总共的内核数。
+
 ### 03 channel
 ### 04 select
 
