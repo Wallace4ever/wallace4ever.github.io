@@ -1630,7 +1630,229 @@ runtime.Goexit()将立即终止当前goroutine执行，调度器会确保所有�
 runtime.GOMAXPROCS(n int)用来设置可以并行计算的CPU内核数的最大值，参数为指定的内核数，返回值为总共的内核数。
 
 ### 03 channel
+并发编程中一个常见的问题是资源竞争问题，为此需要一定的同步机制。**goroutine奉行通过通信来共享内存（和同步），而不是共享内存来通信。**
+
+引用类型channel是CSP模式的具体实现，用于goroutine通讯，其内部实现了同步，确保并发安全。和map类似，channel也是通过make创建的对于底层数据结构的引用。channel传参是引用传递，创建方式：
+```go
+make(chan Type) //Type可以是int、string等任意类型，无缓冲区
+make(chan Type, capacity) //指定缓冲区容量，如果为0则和上面等价
+```
+channel通过操作符`<-`来接收和发送数据，语法为：
+```go
+channel <- value //发送value到channel
+<- channel //接收并将其丢弃
+x := <- channel //接收channel中的数据并赋值给x
+x, ok := <- channel //功能同上，同时检查通道是否已关闭或者是否为空
+```
+
+无缓冲区的channel默认是阻塞的，只有向其中发送了内容后才能从中接收数据。
+
+示例，两个人使用打印机，我们想让user1执行完之后user2才能使用打印机：
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+var ch = make(chan int)
+
+//公共资源打印机
+func Printer(str string) {
+	for _, data := range str {
+		fmt.Printf("%c", data)
+		time.Sleep(time.Second)
+	}
+	fmt.Printf("\n")
+}
+
+func user1() {
+	Printer("hello")
+	ch <- 0 //向管道发送数据
+}
+
+func user2() {
+	<- ch //从管道取数据，如果没有数据该goroutine就会阻塞
+	Printer("world")
+}
+
+func main() {
+	go user1()
+	go user2()
+
+	for {
+		//不让主进程结束的死循环
+	}
+}
+```
+
+无缓存的channel是同步的，会阻塞到发送者准备好和接收者也准备好。
+
+有缓存的通道是异步的，通道空时，接收者被阻塞；通道满时，发送者被阻塞。
+
+不需要再写数据时，可以通过`close(ch)`来关闭channel，这时`x, ok := <- ch`得到的ok值就为false，那么读数据的进程就可以检查到管道关闭。关闭channel之后再向其发送数据会导致panic。
+
+除了在循环中检测ok状态来确定是否结束循环外，还有一个简单的方法可以在管道关闭时结束循环：
+```go
+func main() {
+	for num := range ch { //channel关闭时会自动跳出循环
+		fmt.Println("num = ", num)
+	}
+}
+```
+
+单向管道，指定管道只用于读或只用于写：
+```go
+var ch1 chan<- int //只能用于写入int类型的数据，不能读
+var ch2 <-chan int //只能从中读int类型数据，不能写
+
+//双向channel可以隐式转换为单向，单向channel无法转为双向
+var ch3 chan<- int = ch
+var ch4 <-chan int = ch
+```
+单向channel的应用：
+```go
+//参数表示传入的管道只能写
+func producer(out chan<- int) {
+	for i := 0; i < 10; i++ {
+		out <- i * i
+	}
+	close(out)
+}
+
+//只能读
+func consumer(in <-chan int) {
+	for num := range in {
+		fmt.Println("num = ", num)
+	}
+}
+
+func main() {
+	ch := make(chan int)
+
+	//生产者
+	go producer(ch) //channel传参时引用传递
+
+	//消费者
+	go consumer(ch)
+
+	time.Sleep(2 * time.Second)
+}
+```
+
+time包中提供了单次定时器timer的功能，可以帮助控制时间：
+```go
+func main() {
+	//创建定时器，设置时间为2s，两秒后会自动向timer.C这个channel中写入当前时间
+	timer := time.NewTimer(2*time.Second)
+	fmt.Println(time.Now())
+
+	t := <-timer.C
+	fmt.Println(t)
+
+	//也可以通过<-time.After(2 * time.Second)定时产生事件
+	timer.Stop() //停止定时器
+	ok := timer.Reset(1 * time.Second)
+}
+```
+time包中提供了循环定时器ticker：
+```go
+func main() {
+	ticker := time.NewTicker(1 * time.Second)
+
+	i := 0
+	for {
+		<-ticker.C
+
+		i++
+		fmt.Println("i = ", i)
+
+		if i == 5 {
+			ticker.Stop()
+			break
+		}
+	}
+}
+```
+
 ### 04 select
+Go提供了关键字select，通过select可以监听channel上的数据流动。select的用法和switch有些类似，但select最大的一条限制就是其下的case语句里必须是一个IO操作：
+```go
+select {
+	case <- chan1:
+		//如果成功从chan1读取到数据，则执行该语句
+	case chan2 <- 1:
+		//如果成功向chan2写入了1，则执行该语句
+	default:
+		//如果上面都没有成功，则进入默认处理流程
+}
+```
+select会按顺序评估有没有语句可以成功执行，如果没有任意一条语句可以执行（所有都被阻塞）那么这时：1）如果给出了default语句则执行之；2）如果没有给出default语句则select语句将被阻塞，直到至少有一个通信可以进行下去。
+
+如果多个语句都可以执行，那么会选择任意一个执行（不是按照代码中的顺序）。
+
+例子，通过select实现斐波那契数列：
+```go
+func fibonacci(ch chan<- int, canQuit <-chan bool) {
+	x, y := 1, 1
+	for {
+		//监听数据流动
+		select {
+			case ch <- x:
+				x, y := y, x + y
+			case flag := <- canQuit:
+				fmt.Println("flag:", flag)
+				return
+		}
+	}
+}
+
+func main() {
+	ch := make(chan int) //通信的内容是整数
+	canQuit := make(chan bool) //传递程序是否结束
+
+	//消费者协程，从channel读取内容
+	go func() {
+		for i := 0; i < 8; i++ { //从channel中读出8个整数后停止
+			num := <-ch
+			fmt.Println(num)
+		}
+		canQuit <- true
+	}()
+
+	fibonacci(ch, canQuit)
+}
+```
+
+有时会出现goroutine长时间阻塞的情况，为了避免这种情况可以用select来设置超时处理：
+```go
+func main() {
+	ch := make(chan int)
+	canQuit := make(chan bool)
+
+	//新开协程不停检测
+	go func() {
+		for {
+			select {
+				case num := <- ch:
+					fmt.Println("num = ", num)
+				case <- time.After(3 * time.Second):
+					fmt.Println("超时")
+					canQuit <- true
+			}
+		}
+	}()
+
+	for i := 0 ; i < 5; i++ {
+		ch <- i
+		time.Sleep(time.Second)
+	}
+
+	<-canQuit //超时退出前主协程都会阻塞
+	fmt.Println("程序结束")
+}
+```
 
 ## 第七章 网络概述、socket编程
 ### 01 网络概述
