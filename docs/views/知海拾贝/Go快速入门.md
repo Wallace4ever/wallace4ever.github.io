@@ -1854,13 +1854,80 @@ func main() {
 }
 ```
 
-## 第七章 网络概述、socket编程
-### 01 网络概述
-### 02 Socket编程
-### 03 案例：并发的聊天室服务器
+## 第七章 Socket编程
+### 01 Socket编程
+Socket起源于UNIX，UNIX哲学是一切皆文件，都可以用打开->读写->关闭的模式来操作。Socket是该模式的一种实现，也是一种文件描述符。Socket有一个类似于打开文件的函数调用Socket()，该函数返回一个整形的Socket描述符。常用的Socket类型有两种，流式（SOCKET_STREAM）和数据包式（SOCKET_SGRAM），分别对应TCP和UDP协议。
+
+例子：TCP服务器编写
+```go
+package main
+
+import (
+	"fmt"
+	"net"
+)
+
+func handleConn(conn net.Conn) {
+	defer conn.Close()
+	buf := make([]byte, 1024)
+	n, err1 := conn.Read(buf)
+	if err1 != nil {
+		fmt.Println("err1: ", err1)
+		continue
+	}
+
+	fmt.Println("buf: ", string(buf[:n]))
+}
+
+func main() {
+	//监听
+	listener, err := net.Listen("tcp", "127.0.0.1:8000")
+	if err != nil {
+		fmt.Println("err: ", err)
+		return
+	}
+
+	defer listener.Close()
+
+	//等待用户连接
+	for {
+		conn, err := listener.Accept() //未连接时会阻塞
+		if err != nil {
+			fmt.Println("err: ", err)
+			continue
+		}
+
+		go handleConn(conn)
+	}
+}
+```
+TCP客户端编写：
+```go
+package main
+
+import (
+	"fmt"
+	"net"
+)
+
+func main() {
+	conn, err := net.Dial("tcp", "127.0.0.1:8000")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	defer conn.Close()
+
+	conn.Write([]byte("R U OK?"))
+}
+```
+
+### 02 案例：并发的聊天室服务器
 
 ## 第八章 HTTP编程
 ### 01 Web工作方式
 ### 02 HTTP报文格式
 ### 03 HTTP编程
 ### 04 案例：网络爬虫
+
