@@ -10,6 +10,7 @@ categories:
 :::tip
 毕设中有一部分内容涉及到使用自动化脚本批量访问目标网站列表中的所有网站，再进一步采集相关数据。Selenium是一款流行的开源框架，这次就来学习使用Selenium进行web自动化测试。
 :::
+<!-- more -->
 
 ## 使用步骤
 
@@ -100,7 +101,7 @@ public class ElementWait {
 }
 ```
 
-## 02 隐式等待
+### 02 隐式等待
 隐式等待可以在设置的时间范围内不断查找元素，直到找到元素或者超时。使用方式为`driver.manage().timeouts().implicitlyWait(long time, TimeUnit unit)`。该种方式相对灵活，在WebDriver实例的整个生命周期中都有效，但并不是所有的元素都需要等待。
 ```java
 public static void main(String[] args) throws InterruptedException {
@@ -115,7 +116,7 @@ public static void main(String[] args) throws InterruptedException {
 }
 ```
 
-## 03 显式等待
+### 03 显式等待
 用于等待某个条件发生后再继续执行后续代码（例如找到元素、元素可点击、元素已显示等）。使用方式为：
 ```java
 WebDriverWait wait = new WebDriverWait();

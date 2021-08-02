@@ -89,6 +89,11 @@ module.exports = {
         "link": "https://vuepress-theme-reco.recoluan.com"
       }
     ],
+    // 备案
+    //cyberSecurityRecord: '公安部备案文案',
+    //cyberSecurityLink: '公安部备案指向链接',
+    record: '苏ICP备 2021019476 号',
+    recordLink: 'https://beian.miit.gov.cn/',
     //其他配置
     'codeTheme': 'tomorrow',
     "logo": "/logo.png",
